@@ -1,0 +1,5 @@
+godot-cpp/
+compile_commands.json
+*.dblite
+*.md
+*.uid

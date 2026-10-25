@@ -1,0 +1,10 @@
+78098b89c88a74ebe8c20117b8754620
+::res://::1792968858
+icon.svg::CompressedTexture2D::8060528561161943186::1792943423::1792943427::1::::<><><>0<>0<>bc7ec83b744a30909ef8948e14e032f3<>res://.godot/imported/icon.svg-218a8f2b3041327d8a5756f3a245f83b.ctex::
+myrias.gdextension::GDExtension::583279502979356877::1792964958::0::1::::<><><>0<>0<><>::
+myrias_group.gd::GDScript::2909610076859094708::1792967349::0::1::::<>MyriasGroup<><>0<>0<><>::
+node_2d.gd::GDScript::5521695786553431887::1792967156::0::1::::<>Node2D<><>0<>0<><>::
+node_2d.tscn::PackedScene::5236928358025276257::1792967597::0::1::::<><><>0<>0<><>::uid://ckw0r1pci8ped::::res://node_2d.gd<>uid://bvgyso2s5mr0b::::res://assets/bullets.png<>uid://bhpo386ch2vma::::res://myrias_group.gd
+::res://assets/::1792965092
+bullets.png::CompressedTexture2D::3874262796627864151::1786400879::1792965092::1::::<><><>0<>0<>610b436f25e964aaec41698b878cb129<>res://.godot/imported/bullets.png-437e1105c6c3d649fefc588f58960958.ctex::
+::res://bin/::1792966978

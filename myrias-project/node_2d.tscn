@@ -1,0 +1,88 @@
+[gd_scene format=3 uid="uid://cgu2peluqb754"]
+
+[ext_resource type="Script" uid="uid://ckw0r1pci8ped" path="res://node_2d.gd" id="1_epypp"]
+[ext_resource type="Texture2D" uid="uid://bvgyso2s5mr0b" path="res://assets/bullets.png" id="1_wtcfe"]
+[ext_resource type="Script" uid="uid://bhpo386ch2vma" path="res://myrias_group.gd" id="2_0e48y"]
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_0e48y"]
+atlas = ExtResource("1_wtcfe")
+region = Rect2(0, 0, 16, 16)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_epypp"]
+atlas = ExtResource("1_wtcfe")
+region = Rect2(16, 0, 16, 16)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_0hol4"]
+atlas = ExtResource("1_wtcfe")
+region = Rect2(32, 0, 16, 16)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_q6r6c"]
+atlas = ExtResource("1_wtcfe")
+region = Rect2(48, 0, 16, 16)
+
+[sub_resource type="SpriteFrames" id="SpriteFrames_ce6s2"]
+animations = [{
+"frames": [{
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_0e48y")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_epypp")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_0hol4")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_q6r6c")
+}],
+"loop": 1,
+"name": &"default",
+"speed": 5.0
+}]
+
+[sub_resource type="MyriasEntityModel" id="MyriasEntityModel_dlk71"]
+sprite_frames = SubResource("SpriteFrames_ce6s2")
+
+[sub_resource type="MyriasEntityModel" id="MyriasEntityModel_epypp"]
+sprite_frames = SubResource("SpriteFrames_ce6s2")
+
+[node name="Node2D" type="Node2D" unique_id=586481091]
+script = ExtResource("1_epypp")
+
+[node name="MyriasGroup" type="MyriasGroup" parent="." unique_id=1609177270]
+model = SubResource("MyriasEntityModel_dlk71")
+pool_size = 50000
+script = ExtResource("2_0e48y")
+
+[node name="Marker2D" type="Marker2D" parent="MyriasGroup" unique_id=1079487933]
+position = Vector2(379, 234)
+
+[node name="MyriasGroup2" type="MyriasGroup" parent="." unique_id=1382157227]
+model = SubResource("MyriasEntityModel_epypp")
+pool_size = 50000
+script = ExtResource("2_0e48y")
+
+[node name="Marker2D" type="Marker2D" parent="MyriasGroup2" unique_id=131732580]
+position = Vector2(1092, 173)
+
+[node name="MyriasGroup3" type="MyriasGroup" parent="." unique_id=2029508114]
+model = SubResource("MyriasEntityModel_epypp")
+pool_size = 50000
+script = ExtResource("2_0e48y")
+
+[node name="Marker2D" type="Marker2D" parent="MyriasGroup3" unique_id=630076693]
+position = Vector2(804, 586)
+
+[node name="FPSLabel" type="Label" parent="." unique_id=1060386361]
+offset_right = 40.0
+offset_bottom = 23.0
+theme_override_font_sizes/font_size = 32
+text = "FPS: 1000"
+
+[node name="CountLabel" type="Label" parent="." unique_id=1054649162]
+offset_left = -1.0
+offset_top = 55.0
+offset_right = 219.0
+offset_bottom = 100.0
+theme_override_font_sizes/font_size = 32
+text = "Count: 100000"

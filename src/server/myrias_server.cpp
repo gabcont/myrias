@@ -8,8 +8,8 @@
 #include <godot_cpp/classes/texture2d.hpp>
 #include <godot_cpp/classes/time.hpp>
 #include <godot_cpp/templates/hash_set.hpp>
-#include <godot_cpp/variant/packed_vector2_array.hpp>
 #include <godot_cpp/variant/packed_int32_array.hpp>
+#include <godot_cpp/variant/packed_vector2_array.hpp>
 #include <godot_cpp/variant/utility_functions.hpp>
 
 using namespace godot;
@@ -45,16 +45,6 @@ MyriasServer::~MyriasServer() {
     }
 }
 
-void MyriasServer::_bind_methods() {
-    ClassDB::bind_method(D_METHOD("create_group", "model", "pool_size"), &MyriasServer::create_group_bind);
-    ClassDB::bind_method(D_METHOD("spawn", "group_id", "pos", "vel", "animation", "scale", "rot"),
-            &MyriasServer::spawn, DEFVAL(0), DEFVAL(1.0f), DEFVAL(0.0f));
-    ClassDB::bind_method(D_METHOD("remove_group", "group_id"), &MyriasServer::remove_group);
-    ClassDB::bind_method(D_METHOD("despawn", "group_id", "local_index"), &MyriasServer::despawn);
-    ClassDB::bind_method(D_METHOD("get_active_count", "group_id"), &MyriasServer::get_active_count, DEFVAL(-1));
-    ClassDB::bind_method(D_METHOD("on_process_frame"), &MyriasServer::on_process_frame);
-}
-
 GroupContext *MyriasServer::find_group(int p_group_id) {
     for (int i = 0; i < m_groups_ctx.size(); i++) {
         if (m_groups_ctx[i].group_id == p_group_id) {
@@ -77,9 +67,8 @@ void MyriasServer::free_group_render_resources(GroupContext &r_ctx) {
     }
 }
 
-void MyriasServer::ensure_render_resources() {
+void MyriasServer::load_mm_mesh_if_unloaded() {
     if (m_quad.is_null()) {
-        // Explicit quad (y-down, UV 0..1) so the image is not flipped in 2D.
         PackedVector2Array verts;
         verts.push_back(Vector2(-0.5f, -0.5f));
         verts.push_back(Vector2(0.5f, -0.5f));
@@ -114,64 +103,6 @@ void MyriasServer::connect_tick() {
     if (tree != nullptr) {
         tree->connect("process_frame", Callable(this, "on_process_frame"));
         m_tick_connected = true;
-    }
-}
-
-void MyriasServer::build_frame_table(GroupContext &r_ctx) {
-    if (r_ctx.frames.is_null()) {
-        return;
-    }
-    const PackedStringArray names = r_ctx.frames->get_animation_names();
-    for (int a = 0; a < names.size(); a++) {
-        const StringName anim = names[a];
-
-        AnimInfo ainfo;
-        ainfo.start = r_ctx.frame_table.size();
-        ainfo.count = r_ctx.frames->get_frame_count(anim);
-        ainfo.fps = (float)r_ctx.frames->get_animation_speed(anim);
-        ainfo.loop = r_ctx.frames->get_animation_loop(anim);
-
-        float cumulative = 0.0f;
-        for (int f = 0; f < ainfo.count; f++) {
-            // Relative duration: 1.0 means one full frame at the animation speed.
-            const float rel = r_ctx.frames->get_frame_duration(anim, f);
-            cumulative += rel;
-            if (!Math::is_equal_approx(rel, 1.0f)) {
-                ainfo.uniform = false;
-            }
-
-            FrameInfo info;
-            info.end_rel = cumulative;
-
-            Ref<Texture2D> tex = r_ctx.frames->get_frame_texture(anim, f);
-            if (tex.is_null()) {
-                info.uv = Rect2(0, 0, 0, 0);
-                info.size = Vector2();
-                r_ctx.frame_table.push_back(info);
-                continue;
-            }
-
-            Ref<Texture2D> base = tex;
-            Rect2 region(Vector2(), tex->get_size());
-            AtlasTexture *atlas = Object::cast_to<AtlasTexture>(tex.ptr());
-            if (atlas != nullptr && atlas->get_atlas().is_valid()) {
-                base = atlas->get_atlas();
-                region = atlas->get_region();
-            }
-
-            if (!r_ctx.texture.is_valid()) {
-                r_ctx.texture = base->get_rid();
-            } else if (r_ctx.texture != base->get_rid()) {
-                UtilityFunctions::push_warning("MyriasServer: group frames use more than one spritesheet; only the first is drawn correctly.");
-            }
-
-            const Vector2 base_size = base->get_size();
-            info.uv = Rect2(region.position / base_size, region.size / base_size);
-            info.size = region.size;
-            r_ctx.frame_table.push_back(info);
-        }
-        ainfo.total_rel = cumulative;
-        r_ctx.anims.push_back(ainfo);
     }
 }
 
@@ -224,8 +155,6 @@ void MyriasServer::despawn(int p_group_id, int p_local_index) {
 }
 
 void MyriasServer::exec_create_group(int p_group_id, const Ref<MyriasEntityModel> &p_model, int p_pool_size, RID p_canvas_item) {
-
-    // New group's slice starts where the SoA currently ends.
     const int offset = m_entities.physics.size();
     const int new_size = offset + p_pool_size;
 
@@ -233,7 +162,6 @@ void MyriasServer::exec_create_group(int p_group_id, const Ref<MyriasEntityModel
             m_entities.rendering.resize(new_size) != OK ||
             m_entities.logic.resize(new_size) != OK) {
         UtilityFunctions::push_error("MyriasServer: failed to resize SoA, group not created.");
-        // Roll back so all streams stay the same length.
         m_entities.physics.resize(offset);
         m_entities.rendering.resize(offset);
         m_entities.logic.resize(offset);
@@ -247,10 +175,10 @@ void MyriasServer::exec_create_group(int p_group_id, const Ref<MyriasEntityModel
     ctx.pool_size = p_pool_size;
     ctx.frames = p_model->get_sprite_frames();
     ctx.ci = p_canvas_item;
-    build_frame_table(ctx);
+    ctx.frame_table = FrameTable(ctx.frames);
+    ctx.texture = FrameTable::extract_texture(ctx.frames);
 
-    // Render setup: one MultiMesh per group, drawn on the group's CanvasItem.
-    ensure_render_resources();
+    load_mm_mesh_if_unloaded();
     RenderingServer *rs = RenderingServer::get_singleton();
     ctx.multimesh = rs->multimesh_create();
     rs->multimesh_set_mesh(ctx.multimesh, m_quad->get_rid());
@@ -269,12 +197,7 @@ void MyriasServer::exec_create_group(int p_group_id, const Ref<MyriasEntityModel
         rs->canvas_item_add_multimesh(ctx.ci, ctx.multimesh, ctx.texture);
     }
 
-    // Appending to the context list starts its processing.
     m_groups_ctx.push_back(ctx);
-}
-
-int MyriasServer::create_group_bind(const Ref<MyriasEntityModel> &p_model, int p_pool_size) {
-    return create_group(p_model, p_pool_size, RID());
 }
 
 void MyriasServer::exec_remove_group(int p_group_id) {
@@ -282,7 +205,6 @@ void MyriasServer::exec_remove_group(int p_group_id) {
     if (g == nullptr || g->released) {
         return;
     }
-    // The owning node clears its own CanvasItem (it may already be freed here).
     free_group_render_resources(*g);
     g->ci = RID();
     g->active_amount = 0;
@@ -324,8 +246,6 @@ void MyriasServer::exec_despawn(int p_group_id, int p_local_index) {
     g->dirty = true;
 }
 
-// Stable compaction: surviving entities keep their relative (spawn) order,
-// so each group's slice stays sorted by spawn_seq.
 void MyriasServer::compact(GroupContext &r_ctx) {
     PhysicsStream *phys = m_entities.physics.ptrw() + r_ctx.offset;
     RenderingStream *rend = m_entities.rendering.ptrw() + r_ctx.offset;
@@ -347,47 +267,24 @@ void MyriasServer::compact(GroupContext &r_ctx) {
     r_ctx.dirty = false;
 }
 
-// Frame shown after p_lifetime seconds, from the animation's fps, loop flag and per-frame durations.
-uint16_t MyriasServer::compute_frame(const GroupContext &p_ctx, const AnimInfo &p_anim, float p_lifetime) {
-    if (p_anim.count <= 1 || p_anim.fps <= 0.0f || p_anim.total_rel <= 0.0f) {
-        return 0;
-    }
-    float t = p_lifetime * p_anim.fps; // Relative units elapsed.
-    if (p_anim.loop) {
-        t = Math::fmod(t, p_anim.total_rel);
-    } else if (t >= p_anim.total_rel) {
-        return (uint16_t)(p_anim.count - 1); // Finished: hold the last frame.
-    }
-
-    if (p_anim.uniform) {
-        return (uint16_t)MIN((int)t, p_anim.count - 1);
-    }
-    const FrameInfo *frames = p_ctx.frame_table.ptr() + p_anim.start;
-    for (int i = 0; i < p_anim.count; i++) {
-        if (t < frames[i].end_rel) {
-            return (uint16_t)i;
-        }
-    }
-    return (uint16_t)(p_anim.count - 1);
-}
-
-void MyriasServer::render(GroupContext &r_ctx) {
-    if (r_ctx.frame_table.is_empty() || r_ctx.anims.is_empty()) {
+void MyriasServer::render_group(GroupContext &r_ctx) {
+    if (r_ctx.frame_table.frames.is_empty() || r_ctx.frame_table.anims.is_empty()) {
         return;
     }
+
     const RenderingStream *rend = m_entities.rendering.ptr() + r_ctx.offset;
     const PhysicsStream *phys = m_entities.physics.ptr() + r_ctx.offset;
     float *out = r_ctx.buffer.ptrw();
-    const int last_anim = r_ctx.anims.size() - 1;
+    const int last_anim = r_ctx.frame_table.anims.size() - 1;
 
     for (int i = 0; i < r_ctx.active_amount; i++) {
         const RenderingStream &r = rend[i];
-        const int anim = MIN((int)r.cur_animation, last_anim);
-        const AnimInfo &ai = r_ctx.anims[anim];
+        const int anim = CLAMP((int)r.cur_animation, 0, last_anim);
+        const AnimInfo &ai = r_ctx.frame_table.anims[anim];
         if (ai.count <= 0) {
             continue;
         }
-        const FrameInfo &fi = r_ctx.frame_table[ai.start + MIN((int)r.cur_frame, ai.count - 1)];
+        const FrameInfo &fi = r_ctx.frame_table.frames[ai.start + MIN((int)r.cur_frame, ai.count - 1)];
 
         const float c = Math::cos(r.rot) * r.scale;
         const float s = Math::sin(r.rot) * r.scale;
@@ -402,7 +299,7 @@ void MyriasServer::render(GroupContext &r_ctx) {
         o[5] = c * fi.size.y;
         o[6] = 0.0f;
         o[7] = phys[i].y;
-        // Custom data: frame UV rect.
+        // Custom data: frame UV rect
         o[8] = fi.uv.position.x;
         o[9] = fi.uv.position.y;
         o[10] = fi.uv.size.x;
@@ -418,12 +315,9 @@ void MyriasServer::flush_commands() {
     if (m_commands.is_empty()) {
         return;
     }
-    // Commands queued while flushing go to the next frame.
     const Vector<MyriasCommand> batch = m_commands;
     m_commands.clear();
 
-    // Groups created and removed within the same batch are skipped entirely: their
-    // CanvasItem may already be freed, and the net effect is nothing.
     HashSet<int> created;
     HashSet<int> doomed;
     for (int i = 0; i < batch.size(); i++) {
@@ -474,7 +368,6 @@ int MyriasServer::get_active_count(int p_group_id) const {
 }
 
 void MyriasServer::on_process_frame() {
-    // SceneTree.process_frame carries no delta, so measure it (scaled like Godot's own delta).
     const uint64_t now = Time::get_singleton()->get_ticks_usec();
     const double delta = m_last_process_usec == 0 ? 0.0 : (now - m_last_process_usec) / 1000000.0;
     m_last_process_usec = now;
@@ -502,29 +395,58 @@ void MyriasServer::process_tick(double p_delta) {
         // Kinematics Process
         PhysicsStream *phys = m_entities.physics.ptrw() + g.offset;
         for (int j = 0; j < g.active_amount; j++) {
-            if (phys[j].x >= 1280 or phys[j].x <= 0) {
+            if (phys[j].x >= 1280 || phys[j].x <= 0) {
                 phys[j].vel_x *= -1;
             }
-            if (phys[j].y >= 720 or phys[j].y <= 0) {
+            if (phys[j].y >= 720 || phys[j].y <= 0) {
                 phys[j].vel_y *= -1;
             }
             phys[j].x += phys[j].vel_x * (float)p_delta;
             phys[j].y += phys[j].vel_y * (float)p_delta;
-
         }
 
         // Logic Process: age the entities and derive their animation frame from it.
-        if (!g.anims.is_empty()) {
+        if (!g.frame_table.anims.is_empty()) {
             LogicStream *logic = m_entities.logic.ptrw() + g.offset;
             RenderingStream *rend = m_entities.rendering.ptrw() + g.offset;
-            const int last_anim = g.anims.size() - 1;
             for (int j = 0; j < g.active_amount; j++) {
                 logic[j].lifetime += (float)p_delta;
-                const AnimInfo &ai = g.anims[MIN((int)rend[j].cur_animation, last_anim)];
-                rend[j].cur_frame = compute_frame(g, ai, logic[j].lifetime);
+                rend[j].cur_frame = g.frame_table.compute_frame(rend[j].cur_animation, logic[j].lifetime);
             }
         }
 
-        render(g);
+        render_group(g);
     }
+}
+
+void MyriasServer::refresh_group_canvas_item(int p_group_id, RID p_canvas_item) {
+    GroupContext *g = find_group(p_group_id);
+    if (g == nullptr || g->released) {
+        return;
+    }
+    RenderingServer *rs = RenderingServer::get_singleton();
+    if (rs == nullptr) {
+        return;
+    }
+
+    g->ci = p_canvas_item;
+    if (g->ci.is_valid()) {
+        if (g->material.is_valid()) {
+            rs->canvas_item_set_material(g->ci, g->material);
+        }
+        if (g->multimesh.is_valid()) {
+            rs->canvas_item_add_multimesh(g->ci, g->multimesh, g->texture);
+        }
+    }
+}
+
+void MyriasServer::_bind_methods() {
+    ClassDB::bind_method(D_METHOD("create_group", "model", "pool_size", "canvas_item"), &MyriasServer::create_group, DEFVAL(RID()));
+    ClassDB::bind_method(D_METHOD("remove_group", "group_id"), &MyriasServer::remove_group);
+    ClassDB::bind_method(D_METHOD("refresh_group_canvas_item", "group_id", "canvas_item"), &MyriasServer::refresh_group_canvas_item);
+    ClassDB::bind_method(D_METHOD("spawn", "group_id", "pos", "vel", "animation", "scale", "rot"),
+            &MyriasServer::spawn, DEFVAL(0), DEFVAL(1.0f), DEFVAL(0.0f));
+    ClassDB::bind_method(D_METHOD("despawn", "group_id", "local_index"), &MyriasServer::despawn);
+    ClassDB::bind_method(D_METHOD("get_active_count", "group_id"), &MyriasServer::get_active_count, DEFVAL(-1));
+    ClassDB::bind_method(D_METHOD("on_process_frame"), &MyriasServer::on_process_frame);
 }

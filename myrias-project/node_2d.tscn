@@ -37,22 +37,52 @@ animations = [{
 }],
 "loop": 1,
 "name": &"default",
-"speed": 5.0
+"speed": 10.0
 }]
-
-[sub_resource type="MyriasEntityModel" id="MyriasEntityModel_dlk71"]
-sprite_frames = SubResource("SpriteFrames_ce6s2")
 
 [sub_resource type="MyriasEntityModel" id="MyriasEntityModel_epypp"]
 sprite_frames = SubResource("SpriteFrames_ce6s2")
 
+[sub_resource type="MyriasEntityModel" id="MyriasEntityModel_dlk71"]
+sprite_frames = SubResource("SpriteFrames_ce6s2")
+
+[sub_resource type="SpriteFrames" id="SpriteFrames_epypp"]
+animations = [{
+"frames": [{
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_0e48y")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_epypp")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_0hol4")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_q6r6c")
+}],
+"loop": 1,
+"name": &"default",
+"speed": 10.0
+}]
+
 [node name="Node2D" type="Node2D" unique_id=586481091]
 script = ExtResource("1_epypp")
+
+[node name="MyriasGroup3" type="MyriasGroup" parent="." unique_id=2029508114]
+model = SubResource("MyriasEntityModel_epypp")
+pool_size = 50000
+script = ExtResource("2_0e48y")
+incremental = 0.05
+
+[node name="Marker2D" type="Marker2D" parent="MyriasGroup3" unique_id=630076693]
+position = Vector2(804, 586)
 
 [node name="MyriasGroup" type="MyriasGroup" parent="." unique_id=1609177270]
 model = SubResource("MyriasEntityModel_dlk71")
 pool_size = 50000
 script = ExtResource("2_0e48y")
+incremental = 0.1
 
 [node name="Marker2D" type="Marker2D" parent="MyriasGroup" unique_id=1079487933]
 position = Vector2(379, 234)
@@ -64,14 +94,6 @@ script = ExtResource("2_0e48y")
 
 [node name="Marker2D" type="Marker2D" parent="MyriasGroup2" unique_id=131732580]
 position = Vector2(1092, 173)
-
-[node name="MyriasGroup3" type="MyriasGroup" parent="." unique_id=2029508114]
-model = SubResource("MyriasEntityModel_epypp")
-pool_size = 50000
-script = ExtResource("2_0e48y")
-
-[node name="Marker2D" type="Marker2D" parent="MyriasGroup3" unique_id=630076693]
-position = Vector2(804, 586)
 
 [node name="FPSLabel" type="Label" parent="." unique_id=1060386361]
 offset_right = 40.0
@@ -86,3 +108,8 @@ offset_right = 219.0
 offset_bottom = 100.0
 theme_override_font_sizes/font_size = 32
 text = "Count: 100000"
+
+[node name="AnimatedSprite2D" type="AnimatedSprite2D" parent="." unique_id=529929291]
+position = Vector2(1358, 824)
+sprite_frames = SubResource("SpriteFrames_epypp")
+autoplay = "default"

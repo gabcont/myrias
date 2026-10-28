@@ -3,5 +3,5 @@ entry_symbol = "myrias"
 compatibility_minimum = "4.7"
 
 [libraries]
-linux.debug.x86_64 = "bin/libmyrias.linux.x86_64"
-linux.release.x86_64 = "bin/libmyrias.linux.x86_64"
+linux.debug.x86_64 = "../bin/libmyrias.linux.x86_64"
+linux.release.x86_64 = "../bin/libmyrias.linux.x86_64"

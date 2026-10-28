@@ -23,29 +23,40 @@ void MyriasGroup::_notification(int p_what) {
     if (Engine::get_singleton()->is_editor_hint()) {
         return;
     }
-    if (p_what == NOTIFICATION_EXIT_TREE) {
-        MyriasServer *server = MyriasServer::get_singleton();
-        if (server != nullptr && m_group_id >= 0) {
-            server->remove_group(m_group_id);
+    switch (p_what) {
+        case NOTIFICATION_EXIT_TREE: {
+            MyriasServer *server = MyriasServer::get_singleton();
+            if (server != nullptr && m_group_id >= 0) {
+                server->remove_group(m_group_id);
+            }
+            // Drop the queued multimesh draw call now, while our CanvasItem is surely valid.
+            RenderingServer::get_singleton()->canvas_item_clear(get_canvas_item());
+            m_group_id = -1;
+            break;
         }
-        // Drop the queued multimesh draw call now, while our CanvasItem is surely valid.
-        RenderingServer::get_singleton()->canvas_item_clear(get_canvas_item());
-        m_group_id = -1;
-        return;
+        case NOTIFICATION_ENTER_TREE: {
+            MyriasServer *server = MyriasServer::get_singleton();
+            if (server == nullptr) {
+                UtilityFunctions::push_error("MyriasGroup: MyriasServer is not available.");
+                return;
+            }
+            if (m_model.is_null()) {
+                UtilityFunctions::push_error("MyriasGroup: no model assigned, group not created.");
+                return;
+            }
+            m_group_id = server->create_group(m_model, m_pool_size, get_canvas_item());
+            break;
+        }
+        case NOTIFICATION_DRAW: {
+            MyriasServer *server = MyriasServer::get_singleton();
+            if (server != nullptr && m_group_id >= 0) {
+                server->refresh_group_canvas_item(m_group_id, get_canvas_item());
+            }
+            break;
+        }
+        default:
+            break;
     }
-    if (p_what != NOTIFICATION_ENTER_TREE) {
-        return;
-    }
-    MyriasServer *server = MyriasServer::get_singleton();
-    if (server == nullptr) {
-        UtilityFunctions::push_error("MyriasGroup: MyriasServer is not available.");
-        return;
-    }
-    if (m_model.is_null()) {
-        UtilityFunctions::push_error("MyriasGroup: no model assigned, group not created.");
-        return;
-    }
-    m_group_id = server->create_group(m_model, m_pool_size, get_canvas_item());
 }
 
 void MyriasGroup::set_model(const Ref<MyriasEntityModel> &p_model) {

@@ -9,6 +9,8 @@
 #include "resources/myrias_entity_model.h"
 #include "structs/myrias_command.h"
 #include "structs/myrias_entity_streams.h"
+#include "structs/myrias_physics_event.h"
+#include "structs/myrias_spatial_grid.h"
 #include "structs/myrias_sprite_table.h"
 
 using namespace godot;
@@ -21,6 +23,7 @@ private:
 
     EntitySoA m_entities;
     Vector<GroupContext> m_groups_ctx;
+    MyriasSpatialGrid m_spatial_grid;
     int m_next_group_id = 0;
     uint64_t m_next_spawn_seq = 0;
 
@@ -28,20 +31,21 @@ private:
     bool m_tick_connected = false;
     uint64_t m_last_process_usec = 0;
     Vector<MyriasCommand> m_commands;
+    Vector<MyriasPhysicsEvent> m_physics_events;
 
     GroupContext *find_group(int p_group_id);
     void load_mm_mesh_if_unloaded();
     void free_group_render_resources(GroupContext &r_ctx);
     void connect_tick();
 
-    void exec_create_group(int p_group_id, const Ref<MyriasEntityModel> &p_model, int p_pool_size, RID p_canvas_item);
+    void exec_create_group(const MyriasCommand &p_cmd);
     void exec_remove_group(int p_group_id);
     void exec_spawn(const MyriasCommand &p_cmd);
     void exec_despawn(int p_group_id, int p_local_index);
     void flush_commands();
+    void flush_physics_events();
     void on_process_frame();
 
-    void compact(GroupContext &r_ctx);
     void render_group(GroupContext &r_ctx);
 
 
@@ -69,6 +73,16 @@ public:
 
     // Active entities in the given group, or in all groups if p_group_id is -1 (default).
     int get_active_count(int p_group_id = -1) const;
+
+    // Configures the bounded spatial grid bounds and cell size.
+    void configure_spatial_grid(Rect2 p_bounds, float p_cell_size = 32.0f);
+    // Queries if any entity matching p_collision_mask (and in p_group_id if >= 0) overlaps the circle (p_pos, p_radius).
+    bool query_collision(Vector2 p_pos, float p_radius, int p_group_id = -1, uint16_t p_collision_mask = 0xFFFF) const;
+
+    // Pushes a physics event into the event buffer to be processed at the start of the next frame.
+    void push_physics_event(const MyriasPhysicsEvent &p_event);
+    void emit_animation_change_event(int p_group_id, int p_local_index, int p_animation);
+    void emit_despawn_event(int p_group_id, int p_local_index);
 
     // Per render frame (SceneTree.process_frame): commands, compaction, simple kinematics,
     // logic and render buffers.

@@ -35,9 +35,7 @@ MyriasServer::~MyriasServer() {
     RenderingServer *rs = RenderingServer::get_singleton();
     if (rs != nullptr) {
         for (int i = 0; i < m_groups_ctx.size(); i++) {
-            if (!m_groups_ctx[i].released) {
-                free_group_render_resources(m_groups_ctx.ptrw()[i]);
-            }
+            free_group_render_resources(m_groups_ctx.ptrw()[i]);
         }
     }
     if (s_singleton == this) {
@@ -46,8 +44,12 @@ MyriasServer::~MyriasServer() {
 }
 
 GroupContext *MyriasServer::find_group(int p_group_id) {
+    if (p_group_id < 0 || p_group_id > 65535) {
+        return nullptr;
+    }
+    const uint16_t gid = (uint16_t)p_group_id;
     for (int i = 0; i < m_groups_ctx.size(); i++) {
-        if (m_groups_ctx[i].group_id == p_group_id) {
+        if (m_groups_ctx[i].group_id == gid) {
             return &m_groups_ctx.ptrw()[i];
         }
     }
@@ -116,28 +118,43 @@ int MyriasServer::create_group(const Ref<MyriasEntityModel> &p_model, int p_pool
         return -1;
     }
 
+    const Ref<SpriteFrames> sf = p_model->get_sprite_frames();
+    const uint16_t gid = (uint16_t)m_next_group_id++;
+
     MyriasCommand cmd;
     cmd.type = MyriasCommand::CREATE_GROUP;
-    cmd.group_id = m_next_group_id++;
-    cmd.model = p_model;
-    cmd.pool_size = p_pool_size;
+    cmd.group_id = gid;
+    cmd.frame_table = FrameTable(sf);
+    cmd.texture = FrameTable::extract_texture(sf);
+    cmd.radius = p_model->get_radius();
+    cmd.collision_layer = p_model->get_collision_layer();
+    cmd.collision_mask = p_model->get_collision_mask();
+    cmd.traits = p_model->get_traits() & GROUP_FLAGS_USER_MASK;
+    cmd.pool_size = (uint16_t)p_pool_size;
     cmd.ci = p_canvas_item;
+
     m_commands.push_back(cmd);
     connect_tick();
-    return cmd.group_id;
+    return gid;
 }
 
 void MyriasServer::remove_group(int p_group_id) {
+    if (p_group_id < 0 || p_group_id > 65535) {
+        return;
+    }
     MyriasCommand cmd;
     cmd.type = MyriasCommand::REMOVE_GROUP;
-    cmd.group_id = p_group_id;
+    cmd.group_id = (uint16_t)p_group_id;
     m_commands.push_back(cmd);
 }
 
 void MyriasServer::spawn(int p_group_id, Vector2 p_pos, Vector2 p_vel, int p_animation, float p_scale, float p_rot) {
+    if (p_group_id < 0 || p_group_id > 65535) {
+        return;
+    }
     MyriasCommand cmd;
     cmd.type = MyriasCommand::SPAWN;
-    cmd.group_id = p_group_id;
+    cmd.group_id = (uint16_t)p_group_id;
     cmd.pos = p_pos;
     cmd.vel = p_vel;
     cmd.animation = p_animation;
@@ -147,44 +164,45 @@ void MyriasServer::spawn(int p_group_id, Vector2 p_pos, Vector2 p_vel, int p_ani
 }
 
 void MyriasServer::despawn(int p_group_id, int p_local_index) {
+    if (p_group_id < 0 || p_group_id > 65535) {
+        return;
+    }
     MyriasCommand cmd;
     cmd.type = MyriasCommand::DESPAWN;
-    cmd.group_id = p_group_id;
+    cmd.group_id = (uint16_t)p_group_id;
     cmd.local_index = p_local_index;
     m_commands.push_back(cmd);
 }
 
-void MyriasServer::exec_create_group(int p_group_id, const Ref<MyriasEntityModel> &p_model, int p_pool_size, RID p_canvas_item) {
-    const int offset = m_entities.physics.size();
-    const int new_size = offset + p_pool_size;
-
-    if (m_entities.physics.resize(new_size) != OK ||
-            m_entities.rendering.resize(new_size) != OK ||
-            m_entities.logic.resize(new_size) != OK) {
+void MyriasServer::exec_create_group(const MyriasCommand &p_cmd) {
+    uint32_t offset = 0;
+    if (!m_entities.allocate_slice(p_cmd.pool_size, offset)) {
         UtilityFunctions::push_error("MyriasServer: failed to resize SoA, group not created.");
-        m_entities.physics.resize(offset);
-        m_entities.rendering.resize(offset);
-        m_entities.logic.resize(offset);
         return;
     }
 
     GroupContext ctx;
-    ctx.group_id = p_group_id;
+    ctx.group_id = p_cmd.group_id;
     ctx.offset = offset;
     ctx.active_amount = 0;
-    ctx.pool_size = p_pool_size;
-    ctx.frames = p_model->get_sprite_frames();
-    ctx.ci = p_canvas_item;
-    ctx.frame_table = FrameTable(ctx.frames);
-    ctx.texture = FrameTable::extract_texture(ctx.frames);
+    ctx.pool_size = p_cmd.pool_size;
+    ctx.radius = p_cmd.radius;
+    ctx.collision_layer = p_cmd.collision_layer;
+    ctx.collision_mask = p_cmd.collision_mask;
+    ctx.traits = p_cmd.traits & GROUP_FLAGS_USER_MASK;
+    ctx.ci = p_cmd.ci;
+    ctx.frame_table = p_cmd.frame_table;
+    ctx.texture = p_cmd.texture;
+
+    m_spatial_grid.ensure_capacity(m_entities.physics.size());
 
     load_mm_mesh_if_unloaded();
     RenderingServer *rs = RenderingServer::get_singleton();
     ctx.multimesh = rs->multimesh_create();
     rs->multimesh_set_mesh(ctx.multimesh, m_quad->get_rid());
-    rs->multimesh_allocate_data(ctx.multimesh, p_pool_size, RenderingServer::MULTIMESH_TRANSFORM_2D, false, true);
+    rs->multimesh_allocate_data(ctx.multimesh, p_cmd.pool_size, RenderingServer::MULTIMESH_TRANSFORM_2D, false, true);
     rs->multimesh_set_visible_instances(ctx.multimesh, 0);
-    ctx.buffer.resize((int64_t)p_pool_size * INSTANCE_STRIDE);
+    ctx.buffer.resize((int64_t)p_cmd.pool_size * INSTANCE_STRIDE);
     ctx.buffer.fill(0.0f);
 
     ctx.shader = rs->shader_create();
@@ -201,19 +219,31 @@ void MyriasServer::exec_create_group(int p_group_id, const Ref<MyriasEntityModel
 }
 
 void MyriasServer::exec_remove_group(int p_group_id) {
-    GroupContext *g = find_group(p_group_id);
-    if (g == nullptr || g->released) {
+    if (p_group_id < 0 || p_group_id > 65535) {
         return;
     }
-    free_group_render_resources(*g);
-    g->ci = RID();
-    g->active_amount = 0;
-    g->released = true;
+    const uint16_t gid = (uint16_t)p_group_id;
+    int g_idx = -1;
+    for (int i = 0; i < m_groups_ctx.size(); i++) {
+        if (m_groups_ctx[i].group_id == gid) {
+            g_idx = i;
+            break;
+        }
+    }
+    if (g_idx < 0) {
+        return;
+    }
+
+    GroupContext &g = m_groups_ctx.ptrw()[g_idx];
+    free_group_render_resources(g);
+
+    m_entities.free_slice(g.offset, g.pool_size, m_groups_ctx, (uint16_t)g_idx);
+    m_groups_ctx.remove_at(g_idx);
 }
 
 void MyriasServer::exec_spawn(const MyriasCommand &p_cmd) {
     GroupContext *g = find_group(p_cmd.group_id);
-    if (g == nullptr || g->released || g->active_amount >= g->pool_size) {
+    if (g == nullptr || g->active_amount >= g->pool_size) {
         return;
     }
     const int idx = g->offset + g->active_amount++;
@@ -239,32 +269,11 @@ void MyriasServer::exec_spawn(const MyriasCommand &p_cmd) {
 
 void MyriasServer::exec_despawn(int p_group_id, int p_local_index) {
     GroupContext *g = find_group(p_group_id);
-    if (g == nullptr || g->released || p_local_index < 0 || p_local_index >= g->active_amount) {
+    if (g == nullptr || p_local_index < 0 || p_local_index >= g->active_amount) {
         return;
     }
     m_entities.logic.ptrw()[g->offset + p_local_index].alive = false;
-    g->dirty = true;
-}
-
-void MyriasServer::compact(GroupContext &r_ctx) {
-    PhysicsStream *phys = m_entities.physics.ptrw() + r_ctx.offset;
-    RenderingStream *rend = m_entities.rendering.ptrw() + r_ctx.offset;
-    LogicStream *logic = m_entities.logic.ptrw() + r_ctx.offset;
-
-    int write = 0;
-    for (int read = 0; read < r_ctx.active_amount; read++) {
-        if (!logic[read].alive) {
-            continue;
-        }
-        if (write != read) {
-            phys[write] = phys[read];
-            rend[write] = rend[read];
-            logic[write] = logic[read];
-        }
-        write++;
-    }
-    r_ctx.active_amount = (uint16_t)write;
-    r_ctx.dirty = false;
+    GROUP_SET_DIRTY(g->traits);
 }
 
 void MyriasServer::render_group(GroupContext &r_ctx) {
@@ -318,8 +327,8 @@ void MyriasServer::flush_commands() {
     const Vector<MyriasCommand> batch = m_commands;
     m_commands.clear();
 
-    HashSet<int> created;
-    HashSet<int> doomed;
+    HashSet<uint16_t> created;
+    HashSet<uint16_t> doomed;
     for (int i = 0; i < batch.size(); i++) {
         const MyriasCommand &c = batch[i];
         if (c.type == MyriasCommand::CREATE_GROUP) {
@@ -336,7 +345,7 @@ void MyriasServer::flush_commands() {
         }
         switch (c.type) {
             case MyriasCommand::CREATE_GROUP:
-                exec_create_group(c.group_id, c.model, c.pool_size, c.ci);
+                exec_create_group(c);
                 break;
             case MyriasCommand::REMOVE_GROUP:
                 exec_remove_group(c.group_id);
@@ -355,12 +364,9 @@ int MyriasServer::get_active_count(int p_group_id) const {
     int total = 0;
     for (int i = 0; i < m_groups_ctx.size(); i++) {
         const GroupContext &g = m_groups_ctx[i];
-        if (g.released) {
-            continue;
-        }
         if (p_group_id < 0) {
             total += g.active_amount;
-        } else if (g.group_id == p_group_id) {
+        } else if (g.group_id == (uint16_t)p_group_id) {
             return g.active_amount;
         }
     }
@@ -379,17 +385,79 @@ void MyriasServer::on_process_frame() {
     process_tick(delta * Engine::get_singleton()->get_time_scale());
 }
 
-void MyriasServer::process_tick(double p_delta) {
-    flush_commands();
+void MyriasServer::configure_spatial_grid(Rect2 p_bounds, float p_cell_size) {
+    m_spatial_grid.configure(p_bounds, p_cell_size);
+}
 
-    for (int i = 0; i < m_groups_ctx.size(); i++) {
-        GroupContext &g = m_groups_ctx.ptrw()[i];
-        if (g.released) {
+bool MyriasServer::query_collision(Vector2 p_pos, float p_radius, int p_group_id, uint16_t p_collision_mask) const {
+    return m_spatial_grid.query_collision(p_pos, p_radius, p_group_id, p_collision_mask);
+}
+
+void MyriasServer::push_physics_event(const MyriasPhysicsEvent &p_event) {
+    m_physics_events.push_back(p_event);
+}
+
+void MyriasServer::emit_animation_change_event(int p_group_id, int p_local_index, int p_animation) {
+    MyriasPhysicsEvent ev;
+    ev.type = MyriasPhysicsEvent::CHANGE_ANIMATION;
+    ev.group_id = (uint16_t)p_group_id;
+    ev.local_idx = (uint16_t)p_local_index;
+    ev.param = p_animation;
+    m_physics_events.push_back(ev);
+}
+
+void MyriasServer::emit_despawn_event(int p_group_id, int p_local_index) {
+    MyriasPhysicsEvent ev;
+    ev.type = MyriasPhysicsEvent::DESPAWN;
+    ev.group_id = (uint16_t)p_group_id;
+    ev.local_idx = (uint16_t)p_local_index;
+    m_physics_events.push_back(ev);
+}
+
+void MyriasServer::flush_physics_events() {
+    if (m_physics_events.is_empty()) {
+        return;
+    }
+    const Vector<MyriasPhysicsEvent> events = m_physics_events;
+    m_physics_events.clear();
+
+    RenderingStream *rend_base = m_entities.rendering.ptrw();
+    LogicStream *logic_base = m_entities.logic.ptrw();
+
+    for (int i = 0; i < events.size(); i++) {
+        const MyriasPhysicsEvent &ev = events[i];
+        GroupContext *g = find_group(ev.group_id);
+        if (g == nullptr || ev.local_idx >= g->active_amount) {
             continue;
         }
+        const int abs_idx = g->offset + ev.local_idx;
+        switch (ev.type) {
+            case MyriasPhysicsEvent::CHANGE_ANIMATION:
+                rend_base[abs_idx].cur_animation = (uint16_t)MAX(ev.param, 0);
+                rend_base[abs_idx].cur_frame = 0;
+                logic_base[abs_idx].lifetime = 0.0f; // Reset animation playback time.
+                break;
+            case MyriasPhysicsEvent::DESPAWN:
+                logic_base[abs_idx].alive = false;
+                GROUP_SET_DIRTY(g->traits);
+                break;
+            case MyriasPhysicsEvent::COLLISION:
+                break;
+        }
+    }
+}
 
-        if (g.dirty) {
-            compact(g);
+void MyriasServer::process_tick(double p_delta) {
+    flush_physics_events();
+    flush_commands();
+
+    // 1. Compaction, Kinematics, and Animation Logic
+    for (int i = 0; i < m_groups_ctx.size(); i++) {
+        GroupContext &g = m_groups_ctx.ptrw()[i];
+
+        if (GROUP_IS_DIRTY(g.traits)) {
+            m_entities.compact_group(g.offset, g.active_amount);
+            GROUP_CLEAR_DIRTY(g.traits);
         }
 
         // Kinematics Process
@@ -414,14 +482,23 @@ void MyriasServer::process_tick(double p_delta) {
                 rend[j].cur_frame = g.frame_table.compute_frame(rend[j].cur_animation, logic[j].lifetime);
             }
         }
+    }
 
+    // 2. Spatial Grid Build & Physics Resolution
+    m_spatial_grid.build(m_entities, m_groups_ctx);
+    // (When entity-to-entity / entity-to-native physics resolution is added,
+    //  it will run on the grid proxies here and call m_spatial_grid.sync_to_soa(...))
+
+    // 3. Render Groups
+    for (int i = 0; i < m_groups_ctx.size(); i++) {
+        GroupContext &g = m_groups_ctx.ptrw()[i];
         render_group(g);
     }
 }
 
 void MyriasServer::refresh_group_canvas_item(int p_group_id, RID p_canvas_item) {
     GroupContext *g = find_group(p_group_id);
-    if (g == nullptr || g->released) {
+    if (g == nullptr) {
         return;
     }
     RenderingServer *rs = RenderingServer::get_singleton();
@@ -448,5 +525,9 @@ void MyriasServer::_bind_methods() {
             &MyriasServer::spawn, DEFVAL(0), DEFVAL(1.0f), DEFVAL(0.0f));
     ClassDB::bind_method(D_METHOD("despawn", "group_id", "local_index"), &MyriasServer::despawn);
     ClassDB::bind_method(D_METHOD("get_active_count", "group_id"), &MyriasServer::get_active_count, DEFVAL(-1));
+    ClassDB::bind_method(D_METHOD("configure_spatial_grid", "bounds", "cell_size"), &MyriasServer::configure_spatial_grid, DEFVAL(32.0f));
+    ClassDB::bind_method(D_METHOD("query_collision", "pos", "radius", "group_id", "collision_mask"), &MyriasServer::query_collision, DEFVAL(-1), DEFVAL(0xFFFF));
+    ClassDB::bind_method(D_METHOD("emit_animation_change_event", "group_id", "local_index", "animation"), &MyriasServer::emit_animation_change_event);
+    ClassDB::bind_method(D_METHOD("emit_despawn_event", "group_id", "local_index"), &MyriasServer::emit_despawn_event);
     ClassDB::bind_method(D_METHOD("on_process_frame"), &MyriasServer::on_process_frame);
 }

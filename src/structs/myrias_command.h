@@ -3,7 +3,7 @@
 #include <godot_cpp/variant/rid.hpp>
 #include <godot_cpp/variant/vector2.hpp>
 
-#include "resources/myrias_entity_model.h"
+#include "structs/myrias_sprite_table.h"
 
 using namespace godot;
 
@@ -17,11 +17,16 @@ struct MyriasCommand {
     };
 
     Type type = SPAWN;
-    int group_id = -1;
+    uint16_t group_id = 0;
 
     // CREATE_GROUP
-    Ref<MyriasEntityModel> model;
-    int pool_size = 0;
+    FrameTable frame_table;
+    RID texture;
+    float radius = 8.0f;
+    uint16_t collision_layer = 1;
+    uint16_t collision_mask = 1;
+    uint32_t traits = 0;
+    uint16_t pool_size = 0;
     RID ci;
 
     // SPAWN

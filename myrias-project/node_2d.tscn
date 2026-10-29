@@ -3,6 +3,7 @@
 [ext_resource type="Script" uid="uid://ckw0r1pci8ped" path="res://node_2d.gd" id="1_epypp"]
 [ext_resource type="Texture2D" uid="uid://bvgyso2s5mr0b" path="res://assets/bullets.png" id="1_wtcfe"]
 [ext_resource type="Script" uid="uid://bhpo386ch2vma" path="res://myrias_group.gd" id="2_0e48y"]
+[ext_resource type="Script" uid="uid://b5t3fpcmfb2fh" path="res://detector.gd" id="4_0hol4"]
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_0e48y"]
 atlas = ExtResource("1_wtcfe")
@@ -110,6 +111,7 @@ theme_override_font_sizes/font_size = 32
 text = "Count: 100000"
 
 [node name="AnimatedSprite2D" type="AnimatedSprite2D" parent="." unique_id=529929291]
-position = Vector2(1358, 824)
+position = Vector2(1140, 554)
 sprite_frames = SubResource("SpriteFrames_epypp")
 autoplay = "default"
+script = ExtResource("4_0hol4")

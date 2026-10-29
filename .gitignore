@@ -3,4 +3,6 @@ godot-cpp/
 compile_commands.json
 *.dblite
 *.md
+!docs/**/*.md
+!docs/*.md
 *.uid

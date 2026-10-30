@@ -1,10 +1,10 @@
 #pragma once
 
-#include <cstdint>
 #include <cstring>
 #include <godot_cpp/templates/vector.hpp>
 #include <godot_cpp/variant/packed_float32_array.hpp>
 #include <godot_cpp/variant/rid.hpp>
+#include "structs/myrias_profiling.h"
 #include "structs/myrias_sprite_table.h"
 
 using namespace godot;
@@ -75,6 +75,7 @@ struct EntitySoA {
     }
 
     void free_slice(uint32_t p_offset, uint16_t p_pool_size, Vector<GroupContext> &r_groups, uint16_t p_removed_group_idx) {
+        MYRIAS_PROFILE_ZONE("EntitySoA::free_slice");
         const uint32_t total = (uint32_t)physics.size();
         if (p_offset + p_pool_size > total || p_pool_size == 0) {
             return;
@@ -106,6 +107,7 @@ struct EntitySoA {
     }
 
     void compact_group(uint32_t p_offset, uint16_t &r_active_amount) {
+        MYRIAS_PROFILE_ZONE("EntitySoA::compact_group");
         PhysicsStream *phys = physics.ptrw() + p_offset;
         RenderingStream *rend = rendering.ptrw() + p_offset;
         LogicStream *logic_stream = logic.ptrw() + p_offset;

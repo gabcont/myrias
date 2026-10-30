@@ -27,6 +27,7 @@ sources = get_all_cpp_files(src_dir)
 
 if profile:
     env.Append(CCFLAGS=["-g", "-fno-omit-frame-pointer"])
+    env["LINKFLAGS"] = [f for f in env["LINKFLAGS"] if f not in ["-s", "-Wl,-s"]]
 
 if tracy:
     env.Append(CPPDEFINES=["TRACY_ENABLE", "TRACY_ON_DEMAND"])

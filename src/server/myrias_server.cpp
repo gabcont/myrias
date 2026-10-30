@@ -1,16 +1,16 @@
 #include "myrias_server.h"
 
-#include <godot_cpp/classes/atlas_texture.hpp>
 #include <godot_cpp/classes/engine.hpp>
 #include <godot_cpp/classes/mesh.hpp>
 #include <godot_cpp/classes/rendering_server.hpp>
 #include <godot_cpp/classes/scene_tree.hpp>
-#include <godot_cpp/classes/texture2d.hpp>
 #include <godot_cpp/classes/time.hpp>
 #include <godot_cpp/templates/hash_set.hpp>
 #include <godot_cpp/variant/packed_int32_array.hpp>
 #include <godot_cpp/variant/packed_vector2_array.hpp>
 #include <godot_cpp/variant/utility_functions.hpp>
+
+#include "structs/myrias_profiling.h"
 
 using namespace godot;
 
@@ -175,6 +175,7 @@ void MyriasServer::despawn(int p_group_id, int p_local_index) {
 }
 
 void MyriasServer::exec_create_group(const MyriasCommand &p_cmd) {
+    MYRIAS_PROFILE_ZONE("Myrias::exec_create_group");
     uint32_t offset = 0;
     if (!m_entities.allocate_slice(p_cmd.pool_size, offset)) {
         UtilityFunctions::push_error("MyriasServer: failed to resize SoA, group not created.");
@@ -219,6 +220,7 @@ void MyriasServer::exec_create_group(const MyriasCommand &p_cmd) {
 }
 
 void MyriasServer::exec_remove_group(int p_group_id) {
+    MYRIAS_PROFILE_ZONE("Myrias::exec_remove_group");
     if (p_group_id < 0 || p_group_id > 65535) {
         return;
     }
@@ -242,6 +244,7 @@ void MyriasServer::exec_remove_group(int p_group_id) {
 }
 
 void MyriasServer::exec_spawn(const MyriasCommand &p_cmd) {
+    MYRIAS_PROFILE_ZONE("Myrias::exec_spawn");
     GroupContext *g = find_group(p_cmd.group_id);
     if (g == nullptr || g->active_amount >= g->pool_size) {
         return;
@@ -268,6 +271,7 @@ void MyriasServer::exec_spawn(const MyriasCommand &p_cmd) {
 }
 
 void MyriasServer::exec_despawn(int p_group_id, int p_local_index) {
+    MYRIAS_PROFILE_ZONE("Myrias::exec_despawn");
     GroupContext *g = find_group(p_group_id);
     if (g == nullptr || p_local_index < 0 || p_local_index >= g->active_amount) {
         return;
@@ -321,6 +325,7 @@ void MyriasServer::render_group(GroupContext &r_ctx) {
 }
 
 void MyriasServer::flush_commands() {
+    MYRIAS_PROFILE_ZONE("Myrias::flush_commands");
     if (m_commands.is_empty()) {
         return;
     }
@@ -415,6 +420,7 @@ void MyriasServer::emit_despawn_event(int p_group_id, int p_local_index) {
 }
 
 void MyriasServer::flush_physics_events() {
+    MYRIAS_PROFILE_ZONE("Myrias::flush_physics_events");
     if (m_physics_events.is_empty()) {
         return;
     }
@@ -448,10 +454,13 @@ void MyriasServer::flush_physics_events() {
 }
 
 void MyriasServer::process_tick(double p_delta) {
+    MYRIAS_PROFILE_ZONE("Myrias::process_tick");
+
     flush_physics_events();
     flush_commands();
 
     // 1. Compaction, Kinematics, and Animation Logic
+    int total_active = 0;
     for (int i = 0; i < m_groups_ctx.size(); i++) {
         GroupContext &g = m_groups_ctx.ptrw()[i];
 
@@ -459,22 +468,28 @@ void MyriasServer::process_tick(double p_delta) {
             m_entities.compact_group(g.offset, g.active_amount);
             GROUP_CLEAR_DIRTY(g.traits);
         }
+        total_active += g.active_amount;
 
         // Kinematics Process
-        PhysicsStream *phys = m_entities.physics.ptrw() + g.offset;
-        for (int j = 0; j < g.active_amount; j++) {
-            if (phys[j].x >= 1280 || phys[j].x <= 0) {
-                phys[j].vel_x *= -1;
+        {
+            MYRIAS_PROFILE_ZONE("Myrias::kinematics");
+            PhysicsStream *phys = m_entities.physics.ptrw() + g.offset;
+            for (int j = 0; j < g.active_amount; j++) {
+                if (phys[j].x >= 1280 || phys[j].x <= 0) {
+                    phys[j].vel_x *= -1;
+                }
+                if (phys[j].y >= 720 || phys[j].y <= 0) {
+                    //phys[j].vel_y *= -1;
+                    exec_despawn(g.group_id, j);
+                }
+                phys[j].x += phys[j].vel_x * (float)p_delta;
+                phys[j].y += phys[j].vel_y * (float)p_delta;
             }
-            if (phys[j].y >= 720 || phys[j].y <= 0) {
-                phys[j].vel_y *= -1;
-            }
-            phys[j].x += phys[j].vel_x * (float)p_delta;
-            phys[j].y += phys[j].vel_y * (float)p_delta;
         }
 
         // Logic Process: age the entities and derive their animation frame from it.
         if (!g.frame_table.anims.is_empty()) {
+            MYRIAS_PROFILE_ZONE("Myrias::animation");
             LogicStream *logic = m_entities.logic.ptrw() + g.offset;
             RenderingStream *rend = m_entities.rendering.ptrw() + g.offset;
             for (int j = 0; j < g.active_amount; j++) {
@@ -490,10 +505,16 @@ void MyriasServer::process_tick(double p_delta) {
     //  it will run on the grid proxies here and call m_spatial_grid.sync_to_soa(...))
 
     // 3. Render Groups
-    for (int i = 0; i < m_groups_ctx.size(); i++) {
-        GroupContext &g = m_groups_ctx.ptrw()[i];
-        render_group(g);
+    {
+        MYRIAS_PROFILE_ZONE("Myrias::render_group");
+        for (int i = 0; i < m_groups_ctx.size(); i++) {
+            GroupContext &g = m_groups_ctx.ptrw()[i];
+            render_group(g);
+        }
     }
+
+    MYRIAS_PROFILE_PLOT("Active Entities", total_active);
+    MYRIAS_PROFILE_FRAME();
 }
 
 void MyriasServer::refresh_group_canvas_item(int p_group_id, RID p_canvas_item) {

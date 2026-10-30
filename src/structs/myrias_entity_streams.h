@@ -21,16 +21,29 @@ struct RenderingStream {
 };
 
 struct LogicStream {
-    uint64_t spawn_seq; // Global, monotonically increasing. Newer = drawn on top.
-    float lifetime;     // Seconds since spawn. Drives the animation frame.
-    bool alive;
+    uint64_t spawn_seq = 0; // Global, monotonically increasing. Newer = drawn on top.
+    float lifetime = 0.0f;  // Seconds since spawn. Drives the animation frame.
 };
+
+static inline bool ALIVE_TEST(const uint64_t *bits, uint32_t i) {
+    return (bits[i >> 6] >> (i & 63)) & 1ull;
+}
+
+static inline void ALIVE_SET(uint64_t *bits, uint32_t i) {
+    bits[i >> 6] |= (1ull << (i & 63));
+}
+
+static inline void ALIVE_CLEAR(uint64_t *bits, uint32_t i) {
+    bits[i >> 6] &= ~(1ull << (i & 63));
+}
 
 struct GroupContext {
     uint16_t group_id = 0;
     uint32_t offset = 0;
     uint16_t active_amount = 0;
+    uint16_t last_active = 0;
     uint16_t pool_size = 0;
+    Vector<uint64_t> alive_bits;
     float radius = 8.0f;
     uint16_t collision_layer = 1;
     uint16_t collision_mask = 1;
@@ -70,6 +83,7 @@ struct EntitySoA {
             logic.resize(offset);
             return false;
         }
+        std::memset(logic.ptrw() + offset, 0, p_pool_size * sizeof(LogicStream));
         r_offset = offset;
         return true;
     }
@@ -106,24 +120,48 @@ struct EntitySoA {
         }
     }
 
-    void compact_group(uint32_t p_offset, uint16_t &r_active_amount) {
+    void compact_group(uint32_t p_offset, uint64_t *r_alive_bits, uint16_t &r_active_amount, uint16_t &r_last_active) {
         MYRIAS_PROFILE_ZONE("EntitySoA::compact_group");
         PhysicsStream *phys = physics.ptrw() + p_offset;
         RenderingStream *rend = rendering.ptrw() + p_offset;
         LogicStream *logic_stream = logic.ptrw() + p_offset;
 
         uint16_t write = 0;
-        for (uint16_t read = 0; read < r_active_amount; read++) {
-            if (!logic_stream[read].alive) {
-                continue;
+        const uint16_t old_last = r_last_active;
+        const uint32_t num_words = (old_last + 63) / 64;
+
+        for (uint32_t w = 0; w < num_words; w++) {
+            uint64_t word = r_alive_bits[w];
+            if (w == num_words - 1 && (old_last & 63) != 0) {
+                word &= (1ull << (old_last & 63)) - 1ull;
             }
-            if (write != read) {
-                phys[write] = phys[read];
-                rend[write] = rend[read];
-                logic_stream[write] = logic_stream[read];
+            while (word) {
+                const uint32_t read = (w << 6) + __builtin_ctzll(word);
+                word &= word - 1;
+
+                if (write != read) {
+                    phys[write] = phys[read];
+                    rend[write] = rend[read];
+                    logic_stream[write] = logic_stream[read];
+                }
+                write++;
             }
-            write++;
         }
+
+        // Rewrite bitset: first `write` bits set, rest up to `num_words` cleared
+        const uint32_t full_words = write >> 6;
+        for (uint32_t w = 0; w < full_words; w++) {
+            r_alive_bits[w] = ~0ull;
+        }
+        const uint32_t rem = write & 63;
+        if (full_words < num_words) {
+            r_alive_bits[full_words] = rem ? ((1ull << rem) - 1ull) : 0ull;
+            for (uint32_t w = full_words + 1; w < num_words; w++) {
+                r_alive_bits[w] = 0ull;
+            }
+        }
+
         r_active_amount = write;
+        r_last_active = write;
     }
 };

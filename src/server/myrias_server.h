@@ -46,7 +46,8 @@ private:
     void flush_physics_events();
     void on_process_frame();
 
-    void render_group(GroupContext &r_ctx);
+    void finalize_group_deaths(GroupContext &g);
+    void render_group(int p_group_idx);
 
 
 protected:

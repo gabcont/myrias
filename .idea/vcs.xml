@@ -3,6 +3,7 @@
   <component name="VcsDirectoryMappings">
     <mapping directory="$PROJECT_DIR$" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/godot-cpp" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/thirdparty/highway" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/thirdparty/tracy" vcs="Git" />
   </component>
 </project>

@@ -2,7 +2,11 @@
 godot-cpp/
 compile_commands.json
 *.dblite
+*.os
+*.o
+.godot/
 *.md
 !docs/**/*.md
 !docs/*.md
 *.uid
+*.tracy

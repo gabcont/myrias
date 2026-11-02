@@ -34,6 +34,12 @@ void MyriasGroup::_notification(int p_what) {
             m_group_id = server->create_group(m_model, m_pool_size, get_canvas_item());
             break;
         }
+        case NOTIFICATION_READY: {
+            if (m_group_id >= 0) {
+                _apply_traits();
+            }
+            break;
+        }
         case NOTIFICATION_DRAW: {
             MyriasServer *server = MyriasServer::get_singleton();
             if (server != nullptr && m_group_id >= 0) {
@@ -46,12 +52,61 @@ void MyriasGroup::_notification(int p_what) {
     }
 }
 
+MyriasGroup::~MyriasGroup() {
+    _disconnect_trait_signals();
+}
+
 void MyriasGroup::set_model(const Ref<MyriasEntityModel> &p_model) {
     m_model = p_model;
 }
 
 Ref<MyriasEntityModel> MyriasGroup::get_model() const {
     return m_model;
+}
+
+void MyriasGroup::_disconnect_trait_signals() {
+    for (int i = 0; i < m_traits.size(); i++) {
+        Ref<MyriasTrait> trait = m_traits[i];
+        if (trait.is_valid() && trait->is_connected("changed", Callable(this, "_on_trait_changed"))) {
+            trait->disconnect("changed", Callable(this, "_on_trait_changed"));
+        }
+    }
+}
+
+void MyriasGroup::set_traits(const TypedArray<MyriasTrait> &p_traits) {
+    _disconnect_trait_signals();
+    m_traits = p_traits;
+    for (int i = 0; i < m_traits.size(); i++) {
+        Ref<MyriasTrait> trait = m_traits[i];
+        if (trait.is_valid() && !trait->is_connected("changed", Callable(this, "_on_trait_changed"))) {
+            trait->connect("changed", Callable(this, "_on_trait_changed"));
+        }
+    }
+    if (is_inside_tree() && m_group_id >= 0) {
+        _apply_traits();
+    }
+}
+
+TypedArray<MyriasTrait> MyriasGroup::get_traits() const {
+    return m_traits;
+}
+
+void MyriasGroup::_on_trait_changed() {
+    if (is_inside_tree() && m_group_id >= 0) {
+        _apply_traits();
+    }
+}
+
+void MyriasGroup::_apply_traits() {
+    if (m_group_id < 0) {
+        return;
+    }
+    for (int i = 0; i < m_traits.size(); i++) {
+        Ref<MyriasTrait> trait = m_traits[i];
+        if (trait.is_valid()) {
+            trait->apply_to_group(m_group_id, this);
+        }
+    }
 }
 
 void MyriasGroup::set_pool_size(int p_size) {
@@ -69,12 +124,18 @@ int MyriasGroup::get_group_id() const {
 void MyriasGroup::_bind_methods() {
     ClassDB::bind_method(D_METHOD("set_model", "model"), &MyriasGroup::set_model);
     ClassDB::bind_method(D_METHOD("get_model"), &MyriasGroup::get_model);
+    ClassDB::bind_method(D_METHOD("set_traits", "traits"), &MyriasGroup::set_traits);
+    ClassDB::bind_method(D_METHOD("get_traits"), &MyriasGroup::get_traits);
     ClassDB::bind_method(D_METHOD("set_pool_size", "pool_size"), &MyriasGroup::set_pool_size);
     ClassDB::bind_method(D_METHOD("get_pool_size"), &MyriasGroup::get_pool_size);
     ClassDB::bind_method(D_METHOD("get_group_id"), &MyriasGroup::get_group_id);
+    ClassDB::bind_method(D_METHOD("_on_trait_changed"), &MyriasGroup::_on_trait_changed);
 
     ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "model", PROPERTY_HINT_RESOURCE_TYPE, "MyriasEntityModel"),
             "set_model", "get_model");
+    ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "traits", PROPERTY_HINT_TYPE_STRING,
+            vformat("%d/%d:MyriasTrait", Variant::OBJECT, PROPERTY_HINT_RESOURCE_TYPE)),
+            "set_traits", "get_traits");
     ADD_PROPERTY(PropertyInfo(Variant::INT, "pool_size", PROPERTY_HINT_RANGE, "1,65535,1"),
             "set_pool_size", "get_pool_size");
 }

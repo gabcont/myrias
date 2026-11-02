@@ -1,9 +1,12 @@
 #pragma once
 
+#include <memory>
+
 #include <godot_cpp/variant/rid.hpp>
 #include <godot_cpp/variant/vector2.hpp>
 
 #include "structs/myrias_sprite_table.h"
+#include "traits/myrias_traits.h"
 
 using namespace godot;
 
@@ -14,6 +17,9 @@ struct MyriasCommand {
         REMOVE_GROUP,
         SPAWN,
         DESPAWN,
+        CONFIGURE_TRAIT,
+        REMOVE_TRAIT,
+        SET_ENTITY_TRAIT,
     };
 
     Type type = SPAWN;
@@ -36,6 +42,11 @@ struct MyriasCommand {
     float scale = 1.0f;
     float rot = 0.0f;
 
-    // DESPAWN: local index as of the last processed frame.
+    // DESPAWN / SET_ENTITY_TRAIT: local index as of the last processed frame.
     int local_index = -1;
+
+    // TRAIT COMMANDS
+    uint32_t trait_flag = 0;
+    bool trait_enabled = false;
+    std::shared_ptr<TraitConfig> trait_cfg = nullptr;
 };

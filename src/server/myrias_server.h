@@ -1,6 +1,7 @@
 #pragma once
 
 #include <godot_cpp/classes/array_mesh.hpp>
+#include <godot_cpp/classes/curve.hpp>
 #include <godot_cpp/classes/object.hpp>
 #include <godot_cpp/core/class_db.hpp>
 #include <godot_cpp/templates/vector.hpp>
@@ -11,7 +12,20 @@
 #include "structs/myrias_entity_streams.h"
 #include "structs/myrias_physics_event.h"
 #include "structs/myrias_spatial_grid.h"
-#include "structs/myrias_sprite_table.h"
+#include "traits/myrias_traits.h"
+
+// MultiMesh 2D layout without color but with custom data: 8 (transform) + 4 (custom).
+static constexpr int INSTANCE_STRIDE = 12;
+
+// Custom data holds the frame UV rect (x, y, w, h), remapped here onto the quad UVs.
+static const char *MYRIAS_SHADER_CODE = R"(
+shader_type canvas_item;
+void vertex() {
+    UV = INSTANCE_CUSTOM.xy + UV * INSTANCE_CUSTOM.zw;
+}
+)";
+
+#include "resources/myrias_trait.h"
 
 using namespace godot;
 
@@ -42,11 +56,15 @@ private:
     void exec_remove_group(int p_group_id);
     void exec_spawn(const MyriasCommand &p_cmd);
     void exec_despawn(int p_group_id, int p_local_index);
+    void exec_configure_trait(const MyriasCommand &p_cmd);
+    void exec_remove_trait(const MyriasCommand &p_cmd);
+    void exec_set_entity_trait(const MyriasCommand &p_cmd);
     void flush_commands();
     void flush_physics_events();
     void on_process_frame();
 
     void finalize_group_deaths(GroupContext &g);
+    void update_render_packet(GroupContext &g, uint32_t idx, uint16_t anim_idx, uint16_t frame_idx, float scale, float rot);
     void render_group(int p_group_idx);
 
 
@@ -61,7 +79,6 @@ public:
 
     // All the calls below only enqueue a command. The queue is executed in order at the
     // start of the next process(), before compaction and rendering.
-
     // Reserves a group id right away and queues the group creation.
     int create_group(const Ref<MyriasEntityModel> &p_model, int p_pool_size, RID p_canvas_item = RID());
     // Queues the group removal.
@@ -71,6 +88,25 @@ public:
     void spawn(int p_group_id, Vector2 p_pos, Vector2 p_vel, int p_animation = 0, float p_scale = 1.0f, float p_rot = 0.0f);
     // Queues an entity removal by local index.
     void despawn(int p_group_id, int p_local_index);
+
+    // Unified trait configuration (enqueued to run in flush_commands)
+    void configure_trait(int p_group_id, MyriasTraitType p_trait, const std::shared_ptr<TraitConfig> &p_config);
+    void configure_trait_resource(int p_group_id, const Ref<MyriasTrait> &p_trait, Node2D *p_owner = nullptr);
+    void remove_group_trait(int p_group_id, uint32_t p_trait_flag);
+    void set_entity_trait(int p_group_id, int p_local_index, uint32_t p_trait_flag, bool p_enabled);
+
+    // Queries
+    bool has_entity_trait(int p_group_id, int p_local_index, uint32_t p_trait_flag) const;
+    uint32_t get_group_traits(int p_group_id) const;
+
+    // Entity inspection queries
+    Vector2 get_entity_position(int p_group_id, int p_local_index) const;
+    Vector2 get_entity_velocity(int p_group_id, int p_local_index) const;
+    float get_entity_scale(int p_group_id, int p_local_index) const;
+    float get_entity_rotation(int p_group_id, int p_local_index) const;
+
+    String get_simd_target_name() const;
+    void refresh_group_canvas_item(int p_group_id, RID p_canvas_item);
 
     // Active entities in the given group, or in all groups if p_group_id is -1 (default).
     int get_active_count(int p_group_id = -1) const;
@@ -88,6 +124,4 @@ public:
     // Per render frame (SceneTree.process_frame): commands, compaction, simple kinematics,
     // logic and render buffers.
     void process_tick(double p_delta);
-
-    void refresh_group_canvas_item(int p_group_id, RID p_canvas_item);
 };

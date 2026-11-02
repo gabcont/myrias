@@ -9,6 +9,7 @@
 
 #include "nodes/myrias_group.h"
 #include "resources/myrias_entity_model.h"
+#include "resources/myrias_trait.h"
 #include "server/myrias_server.h"
 
 using namespace godot;
@@ -22,14 +23,17 @@ void initialize_example_module(ModuleInitializationLevel p_level) {
 
 	GDREGISTER_CLASS(MyriasEntityModel);
 	GDREGISTER_CLASS(MyriasGroup);
+	GDREGISTER_VIRTUAL_CLASS(MyriasTrait);
+	GDREGISTER_CLASS(MyriasTraitFollowSteering);
+	GDREGISTER_CLASS(MyriasTraitFollowAngular);
+	GDREGISTER_CLASS(MyriasTraitSineWave);
+	GDREGISTER_CLASS(MyriasTraitCurveModifier);
+	GDREGISTER_CLASS(MyriasTraitFaceVelocity);
+	GDREGISTER_CLASS(MyriasTraitFaceNode);
 	GDREGISTER_CLASS(MyriasServer);
 
 	_server_instance = memnew(MyriasServer);
 	Engine::get_singleton()->register_singleton("MyriasServer", _server_instance);
-
-	//_time_manager_instance = memnew(TimeManager);
-	//Engine::get_singleton()->register_singleton("TimeManager", TimeManager::get_singleton());
-
 }
 
 void uninitialize_example_module(ModuleInitializationLevel p_level) {
@@ -44,7 +48,7 @@ void uninitialize_example_module(ModuleInitializationLevel p_level) {
 
 extern "C" {
 	// Initialization.
-	GDExtensionBool GDE_EXPORT myrias(GDExtensionInterfaceGetProcAddress p_get_proc_address, const GDExtensionClassLibraryPtr p_library, GDExtensionInitialization *r_initialization) {
+	GDExtensionBool GDE_EXPORT myrias_library_init(GDExtensionInterfaceGetProcAddress p_get_proc_address, const GDExtensionClassLibraryPtr p_library, GDExtensionInitialization *r_initialization) {
 		godot::GDExtensionBinding::InitObject init_obj(p_get_proc_address, p_library, r_initialization);
 
 		init_obj.register_initializer(initialize_example_module);

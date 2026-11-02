@@ -61,6 +61,7 @@ private:
     void exec_set_entity_trait(const MyriasCommand &p_cmd);
     void flush_commands();
     void flush_physics_events();
+    void on_physics_frame();
     void on_process_frame();
 
     void finalize_group_deaths(GroupContext &g);
@@ -121,7 +122,11 @@ public:
     void emit_animation_change_event(int p_group_id, int p_local_index, int p_animation);
     void emit_despawn_event(int p_group_id, int p_local_index);
 
-    // Per render frame (SceneTree.process_frame): commands, compaction, simple kinematics,
-    // logic and render buffers.
+    // Per physics frame (SceneTree.physics_frame): commands, compaction, bounds, lifetime,
+    // traits, and spatial grid build.
+    void physics_tick(double p_physics_delta);
+
+    // Per render frame (SceneTree.process_frame): commands, compaction, kinematics,
+    // animation, and render buffers.
     void process_tick(double p_delta);
 };

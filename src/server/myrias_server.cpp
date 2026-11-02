@@ -689,6 +689,17 @@ int MyriasServer::get_active_count(int p_group_id) const {
     return p_group_id < 0 ? total : 0;
 }
 
+void MyriasServer::on_physics_frame() {
+    SceneTree *tree = Object::cast_to<SceneTree>(Engine::get_singleton()->get_main_loop());
+    if (tree != nullptr && tree->is_paused()) {
+        return;
+    }
+    Engine *engine = Engine::get_singleton();
+    const int tps = MAX(engine->get_physics_ticks_per_second(), 1);
+    const double physics_delta = (1.0 / (double)tps) * engine->get_time_scale();
+    physics_tick(physics_delta);
+}
+
 void MyriasServer::on_process_frame() {
     const uint64_t now = Time::get_singleton()->get_ticks_usec();
     const double delta = m_last_process_usec == 0 ? 0.0 : (now - m_last_process_usec) / 1000000.0;
@@ -774,9 +785,73 @@ void MyriasServer::connect_tick() {
     }
     SceneTree *tree = Object::cast_to<SceneTree>(Engine::get_singleton()->get_main_loop());
     if (tree != nullptr) {
+        tree->connect("physics_frame", Callable(this, "on_physics_frame"));
         tree->connect("process_frame", Callable(this, "on_process_frame"));
         m_tick_connected = true;
     }
+}
+
+void MyriasServer::physics_tick(double p_physics_delta) {
+    MYRIAS_PROFILE_ZONE("Myrias::physics_tick");
+
+    flush_physics_events();
+    flush_commands();
+
+    for (int i = 0; i < m_groups_ctx.size(); i++) {
+        GroupContext &g = m_groups_ctx.ptrw()[i];
+
+        if (GROUP_IS_DIRTY(g.traits)) {
+            m_entities.compact_group(g.offset, g.alive_bits.ptrw(), g.buffer.ptrw(), g.trait_bits, g.active_amount, g.last_active);
+            GROUP_CLEAR_DIRTY(g.traits);
+        }
+
+        const uint32_t n = g.last_active;
+
+        // Bounds Process: bounce on X, kill on Y
+        {
+            MYRIAS_PROFILE_ZONE("Myrias::bounds");
+            const float *px = m_entities.phys_x.ptr() + g.offset;
+            const float *py = m_entities.phys_y.ptr() + g.offset;
+            float *pvx = m_entities.phys_vel_x.ptrw() + g.offset;
+            for (uint32_t j = 0; j < n; j++) {
+                if (px[j] <= 0.0f || px[j] >= 1280.0f) {
+                    pvx[j] = -pvx[j];
+                }
+                if (py[j] <= 0.0f || py[j] >= 720.0f) {
+                    kill_local(g, j);
+                }
+            }
+            finalize_group_deaths(g);
+        }
+
+        // Advance entity lifetimes before traits and animation
+        {
+            const uint64_t *bits = g.alive_bits.ptr();
+            const uint32_t num_words = (g.last_active + 63) / 64;
+            LogicStream *logic = m_entities.logic.ptrw() + g.offset;
+            const float dt = (float)p_physics_delta;
+            for (uint32_t w = 0; w < num_words; w++) {
+                uint64_t word = bits[w];
+                if (w == num_words - 1 && (g.last_active & 63) != 0) {
+                    word &= (1ull << (g.last_active & 63)) - 1ull;
+                }
+                while (word) {
+                    const uint32_t j = (w << 6) + __builtin_ctzll(word);
+                    word &= word - 1;
+                    logic[j].lifetime += dt;
+                }
+            }
+        }
+
+        // Behavior & Visual Traits Process
+        if ((g.traits & TRAIT_BEHAVIOR_MASK) != 0) {
+            MYRIAS_PROFILE_ZONE("Myrias::traits");
+            myrias::run_group_traits(g, m_entities, (float)p_physics_delta);
+        }
+    }
+
+    // Spatial Grid Build & Physics Resolution
+    m_spatial_grid.build(m_entities, m_groups_ctx);
 }
 
 void MyriasServer::process_tick(double p_delta) {
@@ -785,7 +860,7 @@ void MyriasServer::process_tick(double p_delta) {
     flush_physics_events();
     flush_commands();
 
-    // 1. Compaction, Kinematics, Bounds, and Animation Logic
+    // 1. Compaction, Kinematics, and Animation Logic
     int total_active = 0;
     for (int i = 0; i < m_groups_ctx.size(); i++) {
         GroupContext &g = m_groups_ctx.ptrw()[i];
@@ -810,48 +885,6 @@ void MyriasServer::process_tick(double p_delta) {
                 n,
                 dt
             );
-        }
-
-        // Bounds Process: bounce on X, kill on Y
-        {
-            MYRIAS_PROFILE_ZONE("Myrias::bounds");
-            const float *px = m_entities.phys_x.ptr() + g.offset;
-            const float *py = m_entities.phys_y.ptr() + g.offset;
-            float *pvx = m_entities.phys_vel_x.ptrw() + g.offset;
-            for (uint32_t j = 0; j < n; j++) {
-                if (px[j] <= 0.0f || px[j] >= 1280.0f) {
-                    pvx[j] = -pvx[j];
-                }
-                if (py[j] <= 0.0f || py[j] >= 720.0f) {
-                    kill_local(g, j);
-                }
-            }
-            finalize_group_deaths(g);
-        }
-
-        // Advance entity lifetimes before traits and animation
-        {
-            const uint64_t *bits = g.alive_bits.ptr();
-            const uint32_t num_words = (g.last_active + 63) / 64;
-            LogicStream *logic = m_entities.logic.ptrw() + g.offset;
-            const float dt = (float)p_delta;
-            for (uint32_t w = 0; w < num_words; w++) {
-                uint64_t word = bits[w];
-                if (w == num_words - 1 && (g.last_active & 63) != 0) {
-                    word &= (1ull << (g.last_active & 63)) - 1ull;
-                }
-                while (word) {
-                    const uint32_t j = (w << 6) + __builtin_ctzll(word);
-                    word &= word - 1;
-                    logic[j].lifetime += dt;
-                }
-            }
-        }
-
-        // Behavior & Visual Traits Process
-        if ((g.traits & TRAIT_BEHAVIOR_MASK) != 0) {
-            MYRIAS_PROFILE_ZONE("Myrias::traits");
-            myrias::run_group_traits(g, m_entities, (float)p_delta);
         }
 
         // Animation Process: derive animation frame from aged lifetime
@@ -898,12 +931,7 @@ void MyriasServer::process_tick(double p_delta) {
         }
     }
 
-    // 2. Spatial Grid Build & Physics Resolution
-    m_spatial_grid.build(m_entities, m_groups_ctx);
-    // (When entity-to-entity / entity-to-native physics resolution is added,
-    //  it will run on the grid proxies here and call m_spatial_grid.sync_to_soa(...))
-
-    // 3. Render Groups
+    // 2. Render Groups
     {
         MYRIAS_PROFILE_ZONE("Myrias::render_group");
         for (int i = 0; i < m_groups_ctx.size(); i++) {
@@ -941,6 +969,7 @@ void MyriasServer::_bind_methods() {
     ClassDB::bind_method(D_METHOD("query_collision", "pos", "radius", "group_id", "collision_mask"), &MyriasServer::query_collision, DEFVAL(-1), DEFVAL(0xFFFF));
     ClassDB::bind_method(D_METHOD("emit_animation_change_event", "group_id", "local_index", "animation"), &MyriasServer::emit_animation_change_event);
     ClassDB::bind_method(D_METHOD("emit_despawn_event", "group_id", "local_index"), &MyriasServer::emit_despawn_event);
+    ClassDB::bind_method(D_METHOD("on_physics_frame"), &MyriasServer::on_physics_frame);
     ClassDB::bind_method(D_METHOD("on_process_frame"), &MyriasServer::on_process_frame);
 
     BIND_CONSTANT(TRAIT_FOLLOW_STEERING);

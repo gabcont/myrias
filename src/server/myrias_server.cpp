@@ -21,6 +21,7 @@ MyriasServer *MyriasServer::s_singleton = nullptr;
 
 MyriasServer::MyriasServer() {
     s_singleton = this;
+    set_soa_capacity(DEFAULT_SOA_CAPACITY);
     UtilityFunctions::print("[Myrias] Google Highway SIMD active. Dispatched target: ", myrias::get_hwy_target_name());
 }
 
@@ -330,7 +331,7 @@ float MyriasServer::get_entity_scale(int p_group_id, int p_local_index) const {
         return 0.0f;
     }
     const uint32_t abs_idx = g->offset + p_local_index;
-    return m_entities.rendering[abs_idx].scale;
+    return m_entities.scale[abs_idx];
 }
 
 float MyriasServer::get_entity_rotation(int p_group_id, int p_local_index) const {
@@ -339,7 +340,7 @@ float MyriasServer::get_entity_rotation(int p_group_id, int p_local_index) const
         return 0.0f;
     }
     const uint32_t abs_idx = g->offset + p_local_index;
-    return m_entities.rendering[abs_idx].rot;
+    return m_entities.rot[abs_idx];
 }
 
 void MyriasServer::exec_create_group(const MyriasCommand &p_cmd) {
@@ -367,8 +368,6 @@ void MyriasServer::exec_create_group(const MyriasCommand &p_cmd) {
     ctx.ci = p_cmd.ci;
     ctx.frame_table = p_cmd.frame_table;
     ctx.texture = p_cmd.texture;
-
-    m_spatial_grid.ensure_capacity(m_entities.phys_x.size());
 
     load_mm_mesh_if_unloaded();
     RenderingServer *rs = RenderingServer::get_singleton();
@@ -454,19 +453,14 @@ void MyriasServer::exec_spawn(const MyriasCommand &p_cmd) {
     m_entities.phys_y.ptrw()[abs_idx] = p_cmd.pos.y;
     m_entities.phys_vel_x.ptrw()[abs_idx] = p_cmd.vel.x;
     m_entities.phys_vel_y.ptrw()[abs_idx] = p_cmd.vel.y;
+    m_entities.rot.ptrw()[abs_idx] = p_cmd.rot;
+    m_entities.scale.ptrw()[abs_idx] = p_cmd.scale;
+    m_entities.lifetime.ptrw()[abs_idx] = 0.0f;
+    const uint16_t anim = (uint16_t)MAX(p_cmd.animation, 0);
+    m_entities.cur_animation.ptrw()[abs_idx] = anim;
+    m_entities.cur_frame.ptrw()[abs_idx] = 0;
 
-    RenderingStream &r = m_entities.rendering.ptrw()[abs_idx];
-    r.rot = p_cmd.rot;
-    r.scale = p_cmd.scale;
-    r.z_index = 0;
-    r.cur_animation = (uint16_t)MAX(p_cmd.animation, 0);
-    r.cur_frame = 0;
-
-    LogicStream &l = m_entities.logic.ptrw()[abs_idx];
-    l.spawn_seq = m_next_spawn_seq++;
-    l.lifetime = 0.0f;
-
-    update_render_packet(*g, idx_in_group, r.cur_animation, r.cur_frame, r.scale, r.rot);
+    update_render_packet(*g, idx_in_group, anim, 0, p_cmd.scale, p_cmd.rot);
 }
 
 void MyriasServer::exec_configure_trait(const MyriasCommand &p_cmd) {
@@ -689,6 +683,25 @@ int MyriasServer::get_active_count(int p_group_id) const {
     return p_group_id < 0 ? total : 0;
 }
 
+bool MyriasServer::set_soa_capacity(int p_max_entities) {
+    if (p_max_entities < 0) {
+        return false;
+    }
+    if (!m_entities.set_capacity((uint32_t)p_max_entities)) {
+        return false;
+    }
+    m_spatial_grid.ensure_capacity(p_max_entities);
+    return true;
+}
+
+int MyriasServer::get_soa_capacity() const {
+    return (int)m_entities.m_capacity;
+}
+
+int MyriasServer::get_soa_used() const {
+    return (int)m_entities.m_used;
+}
+
 void MyriasServer::on_physics_frame() {
     SceneTree *tree = Object::cast_to<SceneTree>(Engine::get_singleton()->get_main_loop());
     if (tree != nullptr && tree->is_paused()) {
@@ -749,8 +762,11 @@ void MyriasServer::flush_physics_events() {
     const Vector<MyriasPhysicsEvent> events = m_physics_events;
     m_physics_events.clear();
 
-    RenderingStream *rend_base = m_entities.rendering.ptrw();
-    LogicStream *logic_base = m_entities.logic.ptrw();
+    uint16_t *anim_base = m_entities.cur_animation.ptrw();
+    uint16_t *frame_base = m_entities.cur_frame.ptrw();
+    float *lifetime_base = m_entities.lifetime.ptrw();
+    const float *scale_base = m_entities.scale.ptr();
+    const float *rot_base = m_entities.rot.ptr();
 
     for (int i = 0; i < events.size(); i++) {
         const MyriasPhysicsEvent &ev = events[i];
@@ -762,11 +778,11 @@ void MyriasServer::flush_physics_events() {
         switch (ev.type) {
             case MyriasPhysicsEvent::CHANGE_ANIMATION:
                 if (ALIVE_TEST(g->alive_bits.ptr(), ev.local_idx)) {
-                    RenderingStream &r = rend_base[abs_idx];
-                    r.cur_animation = (uint16_t)MAX(ev.param, 0);
-                    r.cur_frame = 0;
-                    logic_base[abs_idx].lifetime = 0.0f; // Reset animation playback time.
-                    update_render_packet(*g, ev.local_idx, r.cur_animation, r.cur_frame, r.scale, r.rot);
+                    const uint16_t anim = (uint16_t)MAX(ev.param, 0);
+                    anim_base[abs_idx] = anim;
+                    frame_base[abs_idx] = 0;
+                    lifetime_base[abs_idx] = 0.0f; // Reset animation playback time.
+                    update_render_packet(*g, ev.local_idx, anim, 0, scale_base[abs_idx], rot_base[abs_idx]);
                 }
                 break;
             case MyriasPhysicsEvent::DESPAWN:
@@ -828,7 +844,7 @@ void MyriasServer::physics_tick(double p_physics_delta) {
         {
             const uint64_t *bits = g.alive_bits.ptr();
             const uint32_t num_words = (g.last_active + 63) / 64;
-            LogicStream *logic = m_entities.logic.ptrw() + g.offset;
+            float *lifetime = m_entities.lifetime.ptrw() + g.offset;
             const float dt = (float)p_physics_delta;
             for (uint32_t w = 0; w < num_words; w++) {
                 uint64_t word = bits[w];
@@ -838,7 +854,7 @@ void MyriasServer::physics_tick(double p_physics_delta) {
                 while (word) {
                     const uint32_t j = (w << 6) + __builtin_ctzll(word);
                     word &= word - 1;
-                    logic[j].lifetime += dt;
+                    lifetime[j] += dt;
                 }
             }
         }
@@ -890,8 +906,11 @@ void MyriasServer::process_tick(double p_delta) {
         // Animation Process: derive animation frame from aged lifetime
         if (!g.frame_table.anims.is_empty()) {
             MYRIAS_PROFILE_ZONE("Myrias::animation");
-            const LogicStream *logic = m_entities.logic.ptr() + g.offset;
-            RenderingStream *rend = m_entities.rendering.ptrw() + g.offset;
+            const float *lifetime = m_entities.lifetime.ptr() + g.offset;
+            const uint16_t *cur_anim = m_entities.cur_animation.ptr() + g.offset;
+            uint16_t *cur_frame = m_entities.cur_frame.ptrw() + g.offset;
+            const float *scale = m_entities.scale.ptr() + g.offset;
+            const float *rot = m_entities.rot.ptr() + g.offset;
             const uint64_t *bits = g.alive_bits.ptr();
             const uint32_t num_words = (g.last_active + 63) / 64;
             float *buf = g.buffer.ptrw();
@@ -905,14 +924,14 @@ void MyriasServer::process_tick(double p_delta) {
                     const uint32_t j = (w << 6) + __builtin_ctzll(word);
                     word &= word - 1;
 
-                    const uint16_t new_frame = g.frame_table.compute_frame(rend[j].cur_animation, logic[j].lifetime);
-                    if (new_frame != rend[j].cur_frame) {
-                        const int anim_idx = CLAMP((int)rend[j].cur_animation, 0, g.frame_table.anims.size() - 1);
+                    const uint16_t new_frame = g.frame_table.compute_frame(cur_anim[j], lifetime[j]);
+                    if (new_frame != cur_frame[j]) {
+                        const int anim_idx = CLAMP((int)cur_anim[j], 0, g.frame_table.anims.size() - 1);
                         const AnimInfo &ai = g.frame_table.anims[anim_idx];
                         if (ai.count > 0 && !g.frame_table.frames.is_empty()) {
-                            const FrameInfo &old_fi = g.frame_table.frames[ai.start + MIN((int)rend[j].cur_frame, ai.count - 1)];
+                            const FrameInfo &old_fi = g.frame_table.frames[ai.start + MIN((int)cur_frame[j], ai.count - 1)];
                             const FrameInfo &new_fi = g.frame_table.frames[ai.start + MIN((int)new_frame, ai.count - 1)];
-                            rend[j].cur_frame = new_frame;
+                            cur_frame[j] = new_frame;
                             if (new_fi.size == old_fi.size) {
                                 float *o = buf + (int64_t)j * INSTANCE_STRIDE;
                                 o[8] = new_fi.uv.position.x;
@@ -920,10 +939,10 @@ void MyriasServer::process_tick(double p_delta) {
                                 o[10] = new_fi.uv.size.x;
                                 o[11] = new_fi.uv.size.y;
                             } else {
-                                update_render_packet(g, j, rend[j].cur_animation, new_frame, rend[j].scale, rend[j].rot);
+                                update_render_packet(g, j, cur_anim[j], new_frame, scale[j], rot[j]);
                             }
                         } else {
-                            rend[j].cur_frame = new_frame;
+                            cur_frame[j] = new_frame;
                         }
                     }
                 }
@@ -964,6 +983,9 @@ void MyriasServer::_bind_methods() {
     ClassDB::bind_method(D_METHOD("get_entity_rotation", "group_id", "local_index"), &MyriasServer::get_entity_rotation);
 
     ClassDB::bind_method(D_METHOD("get_active_count", "group_id"), &MyriasServer::get_active_count, DEFVAL(-1));
+    ClassDB::bind_method(D_METHOD("set_soa_capacity", "max_entities"), &MyriasServer::set_soa_capacity);
+    ClassDB::bind_method(D_METHOD("get_soa_capacity"), &MyriasServer::get_soa_capacity);
+    ClassDB::bind_method(D_METHOD("get_soa_used"), &MyriasServer::get_soa_used);
     ClassDB::bind_method(D_METHOD("get_simd_target_name"), &MyriasServer::get_simd_target_name);
     ClassDB::bind_method(D_METHOD("configure_spatial_grid", "bounds", "cell_size"), &MyriasServer::configure_spatial_grid, DEFVAL(32.0f));
     ClassDB::bind_method(D_METHOD("query_collision", "pos", "radius", "group_id", "collision_mask"), &MyriasServer::query_collision, DEFVAL(-1), DEFVAL(0xFFFF));

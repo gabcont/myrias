@@ -39,7 +39,6 @@ private:
     Vector<GroupContext> m_groups_ctx;
     MyriasSpatialGrid m_spatial_grid;
     int m_next_group_id = 0;
-    uint64_t m_next_spawn_seq = 0;
 
     Ref<ArrayMesh> m_quad;
     bool m_tick_connected = false;
@@ -111,6 +110,11 @@ public:
 
     // Active entities in the given group, or in all groups if p_group_id is -1 (default).
     int get_active_count(int p_group_id = -1) const;
+
+    // SoA fixed-capacity contiguous buffer pooling controls
+    bool set_soa_capacity(int p_max_entities);
+    int get_soa_capacity() const;
+    int get_soa_used() const;
 
     // Configures the bounded spatial grid bounds and cell size.
     void configure_spatial_grid(Rect2 p_bounds, float p_cell_size = 32.0f);

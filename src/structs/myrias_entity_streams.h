@@ -11,16 +11,7 @@
 
 using namespace godot;
 
-struct RenderingStream {
-    float rot, scale;
-    int z_index;
-    uint16_t cur_animation, cur_frame;
-};
-
-struct LogicStream {
-    uint64_t spawn_seq = 0; // Global, monotonically increasing. Newer = drawn on top.
-    float lifetime = 0.0f;  // Seconds since spawn. Drives the animation frame.
-};
+static constexpr uint32_t DEFAULT_SOA_CAPACITY = 50000;
 
 static inline bool ALIVE_TEST(const uint64_t *bits, uint32_t i) {
     return (bits[i >> 6] >> (i & 63)) & 1ull;
@@ -67,67 +58,57 @@ struct EntitySoA {
     Vector<float> phys_y;
     Vector<float> phys_vel_x;
     Vector<float> phys_vel_y;
-    Vector<RenderingStream> rendering;
-    Vector<LogicStream> logic;
+    Vector<float> rot;
+    Vector<float> scale;
+    Vector<float> lifetime;
+    Vector<uint16_t> cur_animation;
+    Vector<uint16_t> cur_frame;
 
-    void reserve(uint32_t p_capacity) {
-        phys_x.reserve((int64_t)p_capacity);
-        phys_y.reserve((int64_t)p_capacity);
-        phys_vel_x.reserve((int64_t)p_capacity);
-        phys_vel_y.reserve((int64_t)p_capacity);
-        rendering.reserve((int64_t)p_capacity);
-        logic.reserve((int64_t)p_capacity);
+    uint32_t m_capacity = 0;
+    uint32_t m_used = 0;
+
+    bool set_capacity(uint32_t p_capacity) {
+        if (p_capacity < m_used) {
+            return false;
+        }
+        if (phys_x.resize(p_capacity) != OK ||
+                phys_y.resize(p_capacity) != OK ||
+                phys_vel_x.resize(p_capacity) != OK ||
+                phys_vel_y.resize(p_capacity) != OK ||
+                rot.resize(p_capacity) != OK ||
+                scale.resize(p_capacity) != OK ||
+                lifetime.resize(p_capacity) != OK ||
+                cur_animation.resize(p_capacity) != OK ||
+                cur_frame.resize(p_capacity) != OK) {
+            phys_x.resize(m_capacity);
+            phys_y.resize(m_capacity);
+            phys_vel_x.resize(m_capacity);
+            phys_vel_y.resize(m_capacity);
+            rot.resize(m_capacity);
+            scale.resize(m_capacity);
+            lifetime.resize(m_capacity);
+            cur_animation.resize(m_capacity);
+            cur_frame.resize(m_capacity);
+            return false;
+        }
+        m_capacity = p_capacity;
+        return true;
     }
 
     bool allocate_slice(uint16_t p_pool_size, uint32_t &r_offset) {
-        const uint32_t offset = (uint32_t)phys_x.size();
-        const uint32_t new_size = offset + p_pool_size;
-        if (phys_x.resize(new_size) != OK ||
-                phys_y.resize(new_size) != OK ||
-                phys_vel_x.resize(new_size) != OK ||
-                phys_vel_y.resize(new_size) != OK ||
-                rendering.resize(new_size) != OK ||
-                logic.resize(new_size) != OK) {
-            phys_x.resize(offset);
-            phys_y.resize(offset);
-            phys_vel_x.resize(offset);
-            phys_vel_y.resize(offset);
-            rendering.resize(offset);
-            logic.resize(offset);
+        if (p_pool_size == 0 || m_used + p_pool_size > m_capacity) {
             return false;
         }
-        std::memset(phys_x.ptrw() + offset, 0, p_pool_size * sizeof(float));
-        std::memset(phys_y.ptrw() + offset, 0, p_pool_size * sizeof(float));
-        std::memset(phys_vel_x.ptrw() + offset, 0, p_pool_size * sizeof(float));
-        std::memset(phys_vel_y.ptrw() + offset, 0, p_pool_size * sizeof(float));
-        std::memset(logic.ptrw() + offset, 0, p_pool_size * sizeof(LogicStream));
-        r_offset = offset;
+        r_offset = m_used;
+        m_used += p_pool_size;
         return true;
     }
 
     void free_slice(uint32_t p_offset, uint16_t p_pool_size, Vector<GroupContext> &r_groups, uint16_t p_removed_group_idx) {
         MYRIAS_PROFILE_ZONE("EntitySoA::free_slice");
-        const uint32_t total = (uint32_t)phys_x.size();
-        if (p_offset + p_pool_size > total || p_pool_size == 0) {
+        if (p_pool_size == 0 || p_offset + p_pool_size > m_used) {
             return;
         }
-        const uint32_t slice_end = p_offset + p_pool_size;
-        if (slice_end < total) {
-            const uint32_t count_after = total - slice_end;
-            std::memmove(phys_x.ptrw() + p_offset, phys_x.ptr() + slice_end, count_after * sizeof(float));
-            std::memmove(phys_y.ptrw() + p_offset, phys_y.ptr() + slice_end, count_after * sizeof(float));
-            std::memmove(phys_vel_x.ptrw() + p_offset, phys_vel_x.ptr() + slice_end, count_after * sizeof(float));
-            std::memmove(phys_vel_y.ptrw() + p_offset, phys_vel_y.ptr() + slice_end, count_after * sizeof(float));
-            std::memmove(rendering.ptrw() + p_offset, rendering.ptr() + slice_end, count_after * sizeof(RenderingStream));
-            std::memmove(logic.ptrw() + p_offset, logic.ptr() + slice_end, count_after * sizeof(LogicStream));
-        }
-        const uint32_t new_size = total - p_pool_size;
-        phys_x.resize(new_size);
-        phys_y.resize(new_size);
-        phys_vel_x.resize(new_size);
-        phys_vel_y.resize(new_size);
-        rendering.resize(new_size);
-        logic.resize(new_size);
 
         GroupContext *groups = r_groups.ptrw();
         for (int i = 0; i < r_groups.size(); i++) {
@@ -135,9 +116,25 @@ struct EntitySoA {
                 continue;
             }
             if (groups[i].offset > p_offset) {
-                groups[i].offset -= p_pool_size;
+                const uint32_t old_off = groups[i].offset;
+                const uint32_t new_off = old_off - p_pool_size;
+                const uint32_t active_n = groups[i].last_active;
+                if (active_n > 0) {
+                    std::memmove(phys_x.ptrw() + new_off, phys_x.ptr() + old_off, active_n * sizeof(float));
+                    std::memmove(phys_y.ptrw() + new_off, phys_y.ptr() + old_off, active_n * sizeof(float));
+                    std::memmove(phys_vel_x.ptrw() + new_off, phys_vel_x.ptr() + old_off, active_n * sizeof(float));
+                    std::memmove(phys_vel_y.ptrw() + new_off, phys_vel_y.ptr() + old_off, active_n * sizeof(float));
+                    std::memmove(rot.ptrw() + new_off, rot.ptr() + old_off, active_n * sizeof(float));
+                    std::memmove(scale.ptrw() + new_off, scale.ptr() + old_off, active_n * sizeof(float));
+                    std::memmove(lifetime.ptrw() + new_off, lifetime.ptr() + old_off, active_n * sizeof(float));
+                    std::memmove(cur_animation.ptrw() + new_off, cur_animation.ptr() + old_off, active_n * sizeof(uint16_t));
+                    std::memmove(cur_frame.ptrw() + new_off, cur_frame.ptr() + old_off, active_n * sizeof(uint16_t));
+                }
+                groups[i].offset = new_off;
             }
         }
+
+        m_used -= p_pool_size;
     }
 
     void compact_group(uint32_t p_offset, uint64_t *r_alive_bits, float *r_render_buffer, Vector<uint64_t> *r_trait_bits, uint16_t &r_active_amount, uint16_t &r_last_active) {
@@ -146,8 +143,11 @@ struct EntitySoA {
         float *py = phys_y.ptrw() + p_offset;
         float *pvx = phys_vel_x.ptrw() + p_offset;
         float *pvy = phys_vel_y.ptrw() + p_offset;
-        RenderingStream *rend = rendering.ptrw() + p_offset;
-        LogicStream *logic_stream = logic.ptrw() + p_offset;
+        float *prot = rot.ptrw() + p_offset;
+        float *pscale = scale.ptrw() + p_offset;
+        float *plifetime = lifetime.ptrw() + p_offset;
+        uint16_t *panim = cur_animation.ptrw() + p_offset;
+        uint16_t *pframe = cur_frame.ptrw() + p_offset;
 
         uint16_t write = 0;
         const uint16_t old_last = r_last_active;
@@ -167,8 +167,11 @@ struct EntitySoA {
                     py[write] = py[read];
                     pvx[write] = pvx[read];
                     pvy[write] = pvy[read];
-                    rend[write] = rend[read];
-                    logic_stream[write] = logic_stream[read];
+                    prot[write] = prot[read];
+                    pscale[write] = pscale[read];
+                    plifetime[write] = plifetime[read];
+                    panim[write] = panim[read];
+                    pframe[write] = pframe[read];
                     std::memcpy(r_render_buffer + (size_t)write * 12, r_render_buffer + (size_t)read * 12, 12 * sizeof(float));
 
                     if (r_trait_bits != nullptr) {

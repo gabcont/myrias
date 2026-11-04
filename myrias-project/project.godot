@@ -23,6 +23,11 @@ window/stretch/mode="canvas_items"
 window/stretch/aspect="expand"
 window/vsync/vsync_mode=0
 
+[myrias]
+
+debug/draw_static_sdf=true
+debug/draw_dynamic_colliders=true
+
 [physics]
 
 3d/physics_engine="Jolt Physics"

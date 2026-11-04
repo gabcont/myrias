@@ -1,0 +1,231 @@
+[gd_scene format=4 uid="uid://cgu2peluqb754"]
+
+[ext_resource type="Script" uid="uid://ckw0r1pci8ped" path="res://scenes/node_2d.gd" id="1_8ig3b"]
+[ext_resource type="Texture2D" uid="uid://bvgyso2s5mr0b" path="res://assets/bullets.png" id="2_2c3st"]
+[ext_resource type="Script" uid="uid://bhpo386ch2vma" path="res://myrias_group.gd" id="3_f1ear"]
+[ext_resource type="PackedScene" uid="uid://b0y6bcojxsmqv" path="res://scenes/spawner.tscn" id="4_kjmcp"]
+[ext_resource type="Script" uid="uid://b5t3fpcmfb2fh" path="res://detector.gd" id="5_m2y74"]
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_0e48y"]
+atlas = ExtResource("2_2c3st")
+region = Rect2(0, 0, 16, 16)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_epypp"]
+atlas = ExtResource("2_2c3st")
+region = Rect2(16, 0, 16, 16)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_0hol4"]
+atlas = ExtResource("2_2c3st")
+region = Rect2(32, 0, 16, 16)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_q6r6c"]
+atlas = ExtResource("2_2c3st")
+region = Rect2(48, 0, 16, 16)
+
+[sub_resource type="SpriteFrames" id="SpriteFrames_ce6s2"]
+animations = [{
+"frames": [{
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_0e48y")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_epypp")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_0hol4")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_q6r6c")
+}],
+"loop": 1,
+"name": &"default",
+"speed": 10.0
+}]
+
+[sub_resource type="MyriasEntityModel" id="MyriasEntityModel_epypp"]
+sprite_frames = SubResource("SpriteFrames_ce6s2")
+traits = 16
+
+[sub_resource type="MyriasTraitFaceVelocity" id="MyriasTraitFaceVelocity_lkwfj"]
+
+[sub_resource type="MyriasTraitFollowSteering" id="MyriasTraitFollowSteering_0kp58"]
+target_node_path = NodePath("../../Dynamic/CharacterBody2D/AnimatedSprite2D")
+
+[sub_resource type="MyriasTraitSineWave" id="MyriasTraitSineWave_gkas0"]
+
+[sub_resource type="Curve" id="Curve_nvonf"]
+_data = [Vector2(0, 0.5304347), 0.0, 0.0, 0, 0, Vector2(1, 1), 0.0, 0.0, 0, 0]
+point_count = 2
+
+[sub_resource type="MyriasTraitCurveModifier" id="MyriasTraitCurveModifier_vfnja"]
+curve = SubResource("Curve_nvonf")
+loop = true
+
+[sub_resource type="MyriasTraitFaceNode" id="MyriasTraitFaceNode_qbgvs"]
+target_node_path = NodePath("../../Dynamic/CharacterBody2D/AnimatedSprite2D")
+
+[sub_resource type="SpriteFrames" id="SpriteFrames_epypp"]
+animations = [{
+"frames": [{
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_0e48y")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_epypp")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_0hol4")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_q6r6c")
+}],
+"loop": 1,
+"name": &"default",
+"speed": 10.0
+}]
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_dlk71"]
+
+[sub_resource type="PhysicsMaterial" id="PhysicsMaterial_8ig3b"]
+bounce = 1.0
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_dlk71"]
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_8ig3b"]
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_ce6s2"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_dxrgm"]
+size = Vector2(131.42032, 6.368454)
+
+[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_8ig3b"]
+texture = ExtResource("2_2c3st")
+0:0/0 = 0
+0:0/0/physics_layer_0/polygon_0/points = PackedVector2Array(-8, -8, 8, -8, 8, 8, -8, 8)
+1:0/0 = 0
+1:0/0/physics_layer_0/polygon_0/points = PackedVector2Array(-8, -8, 8, -8, 8, 8, -8, 8)
+2:0/0 = 0
+2:0/0/physics_layer_0/polygon_0/points = PackedVector2Array(-8, -8, 8, -8, 8, 8, -8, 8)
+3:0/0 = 0
+3:0/0/physics_layer_0/polygon_0/points = PackedVector2Array(-8, -8, 8, -8, 8, 8, -8, 8)
+
+[sub_resource type="TileSet" id="TileSet_dlk71"]
+physics_layer_0/collision_layer = 2
+physics_layer_0/collision_mask = 13
+sources/0 = SubResource("TileSetAtlasSource_8ig3b")
+
+[node name="Node2D" type="Node2D" unique_id=586481091]
+script = ExtResource("1_8ig3b")
+
+[node name="Spawners" type="Node2D" parent="." unique_id=742055908]
+
+[node name="MyriasGroup3" type="MyriasGroup" parent="Spawners" unique_id=2029508114]
+model = SubResource("MyriasEntityModel_epypp")
+traits = Array[MyriasTrait]([SubResource("MyriasTraitFaceVelocity_lkwfj"), SubResource("MyriasTraitFollowSteering_0kp58")])
+pool_size = 10000
+script = ExtResource("3_f1ear")
+speed = 40
+incremental = 0.05
+
+[node name="Marker2D" type="Marker2D" parent="Spawners/MyriasGroup3" unique_id=630076693]
+position = Vector2(574, 524)
+
+[node name="MyriasGroup4" type="MyriasGroup" parent="Spawners" unique_id=1602639333]
+model = SubResource("MyriasEntityModel_epypp")
+traits = Array[MyriasTrait]([SubResource("MyriasTraitSineWave_gkas0"), SubResource("MyriasTraitCurveModifier_vfnja")])
+pool_size = 10000
+script = ExtResource("3_f1ear")
+speed = 40
+incremental = 0.05
+
+[node name="Marker2D" type="Marker2D" parent="Spawners/MyriasGroup4" unique_id=1960407130]
+position = Vector2(644, 206)
+
+[node name="MyriasGroup" parent="Spawners" unique_id=1289511767 instance=ExtResource("4_kjmcp")]
+pool_size = 10000
+speed = 40
+random = false
+
+[node name="MyriasGroup2" type="MyriasGroup" parent="Spawners" unique_id=1382157227]
+model = SubResource("MyriasEntityModel_epypp")
+traits = Array[MyriasTrait]([SubResource("MyriasTraitFaceNode_qbgvs")])
+pool_size = 10000
+script = ExtResource("3_f1ear")
+speed = 40
+
+[node name="Marker2D" type="Marker2D" parent="Spawners/MyriasGroup2" unique_id=131732580]
+position = Vector2(963, 191)
+
+[node name="FPSLabel" type="Label" parent="." unique_id=1060386361]
+offset_right = 40.0
+offset_bottom = 23.0
+theme_override_font_sizes/font_size = 32
+text = "FPS: 1000"
+metadata/_edit_use_anchors_ = true
+
+[node name="CountLabel" type="Label" parent="." unique_id=1054649162]
+offset_left = -1.0
+offset_top = 55.0
+offset_right = 219.0
+offset_bottom = 100.0
+theme_override_font_sizes/font_size = 32
+text = "Count: 100000"
+metadata/_edit_use_anchors_ = true
+
+[node name="Dynamic" type="Node2D" parent="." unique_id=631343118]
+
+[node name="CharacterBody2D" type="CharacterBody2D" parent="Dynamic" unique_id=1492857485]
+position = Vector2(879, 314)
+motion_mode = 1
+script = ExtResource("5_m2y74")
+
+[node name="AnimatedSprite2D" type="AnimatedSprite2D" parent="Dynamic/CharacterBody2D" unique_id=529929291]
+sprite_frames = SubResource("SpriteFrames_epypp")
+autoplay = "default"
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Dynamic/CharacterBody2D" unique_id=2055184125]
+shape = SubResource("CircleShape2D_dlk71")
+
+[node name="MyriasCollider" type="MyriasCollider" parent="Dynamic/CharacterBody2D" unique_id=833700656]
+
+[node name="RigidBody2D" type="RigidBody2D" parent="Dynamic" unique_id=397364881]
+position = Vector2(353, 470)
+physics_material_override = SubResource("PhysicsMaterial_8ig3b")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Dynamic/RigidBody2D" unique_id=1229888638]
+shape = SubResource("RectangleShape2D_dlk71")
+
+[node name="MyriasCollider" type="MyriasCollider" parent="Dynamic/RigidBody2D" unique_id=392243149]
+
+[node name="Area2D" type="Area2D" parent="Dynamic" unique_id=814851046]
+position = Vector2(210, 166)
+scale = Vector2(5.669526, 4.960021)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Dynamic/Area2D" unique_id=1899882008]
+shape = SubResource("CircleShape2D_8ig3b")
+
+[node name="MyriasCollider" type="MyriasCollider" parent="Dynamic/Area2D" unique_id=1402309856]
+
+[node name="Static" type="Node2D" parent="." unique_id=1561562796]
+
+[node name="MyriasColliderContainer" type="MyriasColliderContainer" parent="Static" unique_id=1642629585]
+mode = 1
+
+[node name="Tube" type="StaticBody2D" parent="Static/MyriasColliderContainer" unique_id=628496649]
+position = Vector2(1101, 450)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Static/MyriasColliderContainer/Tube" unique_id=1995698572]
+scale = Vector2(4.1508703, 4.130466)
+shape = SubResource("CircleShape2D_ce6s2")
+
+[node name="Wall" type="StaticBody2D" parent="Static/MyriasColliderContainer" unique_id=1853526466]
+position = Vector2(93, 586)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Static/MyriasColliderContainer/Wall" unique_id=1834508436]
+position = Vector2(231.24567, -28.152344)
+scale = Vector2(4.0937424, 4.130466)
+shape = SubResource("RectangleShape2D_dxrgm")
+
+[node name="TileMapLayer" type="TileMapLayer" parent="Static/MyriasColliderContainer" unique_id=2081301752]
+tile_map_data = PackedByteArray("AABWACsAAAAAAAAAAABXACsAAAABAAAAAABWACwAAAAAAAAAAABXACwAAAABAAAAAABWAC0AAAAAAAAAAABXAC0AAAABAAAAAABWAC4AAAAAAAAAAABXAC4AAAABAAAAAABWAC8AAAAAAAAAAABXAC8AAAABAAAAAABWADAAAAAAAAAAAABXADAAAAABAAAAAABWADEAAAAAAAAAAABXADEAAAABAAAAAABWADIAAAAAAAAAAABXADIAAAABAAAAAABUADIAAAAAAAAAAABVADIAAAABAAAAAABUADMAAAAAAAAAAABVADMAAAABAAAAAABUADQAAAAAAAAAAABVADQAAAABAAAAAABSADQAAAAAAAAAAABTADQAAAABAAAAAABSADUAAAAAAAAAAABTADUAAAABAAAAAABQADUAAAAAAAAAAABRADUAAAABAAAAAABQADYAAAAAAAAAAABRADYAAAABAAAAAABOADYAAAAAAAAAAABPADYAAAABAAAAAABOADUAAAAAAAAAAABPADUAAAABAAAAAABMADUAAAAAAAAAAABNADUAAAABAAAAAABKADUAAAAAAAAAAABLADUAAAABAAAAAABKADQAAAAAAAAAAABLADQAAAABAAAAAABIADQAAAAAAAAAAABJADQAAAABAAAAAABGADMAAAAAAAAAAABHADMAAAABAAAAAAAMAAIAAAAAAAAAAAANAAIAAAABAAAAAAAOAAIAAAACAAAAAAAPAAIAAAADAAAAAAAaAAIAAAAAAAAAAAAbAAIAAAABAAAAAAAcAAIAAAACAAAAAAAdAAIAAAADAAAAAAAuAAIAAAAAAAAAAAAvAAIAAAABAAAAAAAwAAIAAAACAAAAAAAxAAIAAAADAAAAAAA=")
+tile_set = SubResource("TileSet_dlk71")

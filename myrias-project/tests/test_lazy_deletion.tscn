@@ -1,0 +1,6 @@
+[gd_scene format=3 uid="uid://bv8lazydeletiontest"]
+
+[ext_resource type="Script" uid="uid://testlazydeletion" path="res://tests/test_lazy_deletion.gd" id="1_test"]
+
+[node name="TestLazyDeletion" type="Node2D"]
+script = ExtResource("1_test")

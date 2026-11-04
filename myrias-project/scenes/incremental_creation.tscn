@@ -1,0 +1,6 @@
+[gd_scene format=3 uid="uid://ds0jrs1u1sy15"]
+
+[ext_resource type="Script" uid="uid://chhy4u1aciwvc" path="res://scenes/incremental_creation.gd" id="1_6mlip"]
+
+[node name="IncrementalCreation" type="Node2D" unique_id=1150512975]
+script = ExtResource("1_6mlip")

@@ -1,0 +1,29 @@
+[gd_scene format=3 uid="uid://dcin8ybcldau"]
+
+[ext_resource type="Script" uid="uid://bltplmbl55pt0" path="res://scenes/random_deletion.gd" id="1_ssnog"]
+
+[node name="RandomDeletion" type="Node2D" unique_id=87373097]
+script = ExtResource("1_ssnog")
+max_spawners = 100
+time_between_spawners = 0.1
+time_between_removals = 0.3
+
+[node name="Spawners" type="Node" parent="." unique_id=743315878]
+
+[node name="FPSLabel" type="Label" parent="." unique_id=2010169926]
+offset_left = 22.0
+offset_top = 736.0
+offset_right = 167.0
+offset_bottom = 781.0
+theme_override_font_sizes/font_size = 32
+text = "FPS: 1000"
+metadata/_edit_use_anchors_ = true
+
+[node name="CountLabel" type="Label" parent="." unique_id=1653347307]
+offset_left = 21.0
+offset_top = 791.0
+offset_right = 241.0
+offset_bottom = 836.0
+theme_override_font_sizes/font_size = 32
+text = "Count: 100000"
+metadata/_edit_use_anchors_ = true

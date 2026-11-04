@@ -1,0 +1,135 @@
+[gd_scene format=3 uid="uid://d0plpca2jb2tq"]
+
+[ext_resource type="Script" uid="uid://ckw0r1pci8ped" path="res://scenes/node_2d.gd" id="1_p62fj"]
+[ext_resource type="Texture2D" uid="uid://bvgyso2s5mr0b" path="res://assets/bullets.png" id="2_fypld"]
+[ext_resource type="Script" uid="uid://bhpo386ch2vma" path="res://myrias_group.gd" id="3_r15kw"]
+[ext_resource type="Script" uid="uid://b5t3fpcmfb2fh" path="res://detector.gd" id="5_ec4af"]
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_0e48y"]
+atlas = ExtResource("2_fypld")
+region = Rect2(0, 0, 16, 16)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_epypp"]
+atlas = ExtResource("2_fypld")
+region = Rect2(16, 0, 16, 16)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_0hol4"]
+atlas = ExtResource("2_fypld")
+region = Rect2(32, 0, 16, 16)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_q6r6c"]
+atlas = ExtResource("2_fypld")
+region = Rect2(48, 0, 16, 16)
+
+[sub_resource type="SpriteFrames" id="SpriteFrames_ce6s2"]
+animations = [{
+"frames": [{
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_0e48y")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_epypp")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_0hol4")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_q6r6c")
+}],
+"loop": 1,
+"name": &"default",
+"speed": 10.0
+}]
+
+[sub_resource type="MyriasEntityModel" id="MyriasEntityModel_epypp"]
+sprite_frames = SubResource("SpriteFrames_ce6s2")
+traits = 16
+
+[sub_resource type="SpriteFrames" id="SpriteFrames_epypp"]
+animations = [{
+"frames": [{
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_0e48y")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_epypp")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_0hol4")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_q6r6c")
+}],
+"loop": 1,
+"name": &"default",
+"speed": 10.0
+}]
+
+[node name="Node2D" type="Node2D" unique_id=586481091]
+script = ExtResource("1_p62fj")
+
+[node name="MyriasGroup3" type="MyriasGroup" parent="." unique_id=2029508114]
+model = SubResource("MyriasEntityModel_epypp")
+pool_size = 30000
+script = ExtResource("3_r15kw")
+speed = 20
+incremental = 0.1
+time_between_spawn = 0.0
+
+[node name="Marker2D" type="Marker2D" parent="MyriasGroup3" unique_id=630076693]
+position = Vector2(598, 505)
+
+[node name="MyriasGroup4" type="MyriasGroup" parent="." unique_id=1030049556]
+model = SubResource("MyriasEntityModel_epypp")
+pool_size = 30000
+script = ExtResource("3_r15kw")
+speed = 20
+incremental = 0.1
+time_between_spawn = 0.0
+
+[node name="Marker2D" type="Marker2D" parent="MyriasGroup4" unique_id=69514323]
+position = Vector2(589, 199)
+
+[node name="MyriasGroup5" type="MyriasGroup" parent="." unique_id=1918289255]
+model = SubResource("MyriasEntityModel_epypp")
+pool_size = 30000
+script = ExtResource("3_r15kw")
+speed = 20
+incremental = 0.1
+time_between_spawn = 0.0
+
+[node name="Marker2D" type="Marker2D" parent="MyriasGroup5" unique_id=1268108475]
+position = Vector2(818, 505)
+
+[node name="MyriasGroup6" type="MyriasGroup" parent="." unique_id=1136471846]
+model = SubResource("MyriasEntityModel_epypp")
+pool_size = 30000
+script = ExtResource("3_r15kw")
+speed = 20
+incremental = 0.1
+time_between_spawn = 0.0
+
+[node name="Marker2D" type="Marker2D" parent="MyriasGroup6" unique_id=950067561]
+position = Vector2(809, 199)
+
+[node name="FPSLabel" type="Label" parent="." unique_id=1060386361]
+offset_right = 40.0
+offset_bottom = 23.0
+theme_override_font_sizes/font_size = 32
+text = "FPS: 1000"
+metadata/_edit_use_anchors_ = true
+
+[node name="CountLabel" type="Label" parent="." unique_id=1054649162]
+offset_left = -1.0
+offset_top = 55.0
+offset_right = 219.0
+offset_bottom = 100.0
+theme_override_font_sizes/font_size = 32
+text = "Count: 100000"
+metadata/_edit_use_anchors_ = true
+
+[node name="AnimatedSprite2D" type="AnimatedSprite2D" parent="." unique_id=529929291]
+position = Vector2(1140, 554)
+sprite_frames = SubResource("SpriteFrames_epypp")
+autoplay = "default"
+script = ExtResource("5_ec4af")

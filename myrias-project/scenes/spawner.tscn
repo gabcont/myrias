@@ -1,0 +1,14 @@
+[gd_scene format=3 uid="uid://b0y6bcojxsmqv"]
+
+[ext_resource type="MyriasEntityModel" uid="uid://q8oseycrjv10" path="res://resources/bullet_model.tres" id="1_ik2nu"]
+[ext_resource type="Script" uid="uid://bhpo386ch2vma" path="res://myrias_group.gd" id="2_tx2ig"]
+
+[node name="MyriasGroup" type="MyriasGroup" unique_id=1289511767]
+model = ExtResource("1_ik2nu")
+pool_size = 200
+script = ExtResource("2_tx2ig")
+incremental = 0.1
+random = true
+
+[node name="Marker2D" type="Marker2D" parent="." unique_id=422757889]
+position = Vector2(379, 234)

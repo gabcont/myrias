@@ -11,7 +11,7 @@
 
 using namespace godot;
 
-static constexpr uint32_t DEFAULT_SOA_CAPACITY = 50000;
+static constexpr uint32_t DEFAULT_SOA_CAPACITY = 120000;
 
 static inline bool ALIVE_TEST(const uint64_t *bits, uint32_t i) {
     return (bits[i >> 6] >> (i & 63)) & 1ull;

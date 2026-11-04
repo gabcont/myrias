@@ -1,0 +1,6 @@
+[gd_scene format=3 uid="uid://uy5kcait86vq"]
+
+[ext_resource type="Script" path="res://tests/benchmark_kinematics.gd" id="1_bench"]
+
+[node name="BenchmarkKinematics" type="Node2D"]
+script = ExtResource("1_bench")

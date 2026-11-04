@@ -11,7 +11,8 @@
 #include "structs/myrias_command.h"
 #include "structs/myrias_entity_streams.h"
 #include "structs/myrias_physics_event.h"
-#include "structs/myrias_spatial_grid.h"
+#include "physics/myrias_physics_space.h"
+#include "physics/myrias_spatial_grid.h"
 #include "traits/myrias_traits.h"
 
 // MultiMesh 2D layout without color but with custom data: 8 (transform) + 4 (custom).
@@ -29,6 +30,47 @@ void vertex() {
 
 using namespace godot;
 
+static inline bool is_valid_single_behavior_trait(uint32_t p_flag) {
+    return p_flag != 0 && (p_flag & (p_flag - 1)) == 0 && (p_flag & TRAIT_BEHAVIOR_MASK) == p_flag;
+}
+
+static inline void kill_local(GroupContext &g, uint32_t p_local_idx) {
+    uint64_t *bits = g.alive_bits.ptrw();
+    if (ALIVE_TEST(bits, p_local_idx)) {
+        ALIVE_CLEAR(bits, p_local_idx);
+        g.active_amount--;
+        float *o = g.buffer.ptrw() + (int64_t)p_local_idx * INSTANCE_STRIDE;
+        o[0] = 0.0f;
+        o[1] = 0.0f;
+        o[4] = 0.0f;
+        o[5] = 0.0f;
+    }
+}
+
+static inline void tail_trim_bitset(GroupContext &g) {
+    if (g.last_active == 0 || g.active_amount == 0) {
+        g.last_active = 0;
+        return;
+    }
+    const uint64_t *bits = g.alive_bits.ptr();
+    int32_t w = (int32_t)((g.last_active - 1) >> 6);
+    const uint32_t rem = g.last_active & 63;
+    uint64_t word = bits[w];
+    if (rem != 0) {
+        word &= (1ull << rem) - 1ull;
+    }
+    while (word == 0) {
+        w--;
+        if (w < 0) {
+            g.last_active = 0;
+            return;
+        }
+        word = bits[w];
+    }
+    const uint32_t highest_bit = 63 - __builtin_clzll(word);
+    g.last_active = (uint16_t)((w << 6) + highest_bit + 1);
+}
+
 class MyriasServer : public Object {
     GDCLASS(MyriasServer, Object);
 
@@ -38,7 +80,12 @@ private:
     EntitySoA m_entities;
     Vector<GroupContext> m_groups_ctx;
     MyriasSpatialGrid m_spatial_grid;
+    MyriasPhysicsSpace m_physics_space;
     int m_next_group_id = 0;
+
+    bool m_debug_draw_static_sdf = false;
+    bool m_debug_draw_dynamic_colliders = false;
+    bool m_debug_settings_initialized = false;
 
     Ref<ArrayMesh> m_quad;
     bool m_tick_connected = false;
@@ -48,8 +95,13 @@ private:
 
     GroupContext *find_group(int p_group_id);
     void load_mm_mesh_if_unloaded();
+    void init_group_render_resources(GroupContext &r_ctx);
     void free_group_render_resources(GroupContext &r_ctx);
     void connect_tick();
+    RID get_root_canvas_rid() const;
+    void update_physics_debug_draw();
+    void step_group_bounds(GroupContext &r_group);
+    void step_group_animation(GroupContext &r_group);
 
     void exec_create_group(const MyriasCommand &p_cmd);
     void exec_remove_group(int p_group_id);
@@ -120,6 +172,30 @@ public:
     void configure_spatial_grid(Rect2 p_bounds, float p_cell_size = 32.0f);
     // Queries if any entity matching p_collision_mask (and in p_group_id if >= 0) overlaps the circle (p_pos, p_radius).
     bool query_collision(Vector2 p_pos, float p_radius, int p_group_id = -1, uint16_t p_collision_mask = 0xFFFF) const;
+
+    // Physics Space (Static SDF & Dynamic Colliders)
+    int register_collider(CollisionObject2D *p_node, int p_mode = COLLIDER_MODE_AUTO);
+    void unregister_collider(int p_collider_id);
+    bool set_collider_mode(int p_collider_id, int p_mode);
+    int get_collider_mode(int p_collider_id) const;
+    bool rebuild_collider_shapes(int p_collider_id);
+    void configure_static_sdf(Rect2 p_bounds, float p_cell_size = 8.0f);
+    float sample_static_sdf_distance(Vector2 p_pos, uint16_t p_mask = 0xFFFF) const;
+    Vector2 sample_static_sdf_normal(Vector2 p_pos) const;
+    int sample_static_sdf_layer(Vector2 p_pos) const;
+    int get_static_collider_count() const;
+    int get_dynamic_collider_count() const;
+    bool is_collider_static(int p_collider_id) const;
+    Rect2 get_collider_aabb(int p_collider_id) const;
+
+    // Debug Visualization
+    void set_debug_draw_static_sdf(bool p_enabled);
+    bool is_debug_draw_static_sdf_enabled() const;
+    void set_debug_draw_dynamic_colliders(bool p_enabled);
+    bool is_debug_draw_dynamic_colliders_enabled() const;
+
+    MyriasPhysicsSpace &get_physics_space() { return m_physics_space; }
+    const MyriasPhysicsSpace &get_physics_space() const { return m_physics_space; }
 
     // Pushes a physics event into the event buffer to be processed at the start of the next frame.
     void push_physics_event(const MyriasPhysicsEvent &p_event);

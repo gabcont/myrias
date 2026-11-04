@@ -6,7 +6,11 @@
 
 #include "godot_cpp/core/class_db.hpp"
 #include <godot_cpp/classes/engine.hpp>
+#include <godot_cpp/classes/project_settings.hpp>
+#include <godot_cpp/variant/dictionary.hpp>
 
+#include "nodes/myrias_collider.h"
+#include "nodes/myrias_collider_container.h"
 #include "nodes/myrias_group.h"
 #include "resources/myrias_entity_model.h"
 #include "resources/myrias_trait.h"
@@ -16,6 +20,23 @@ using namespace godot;
 
 static MyriasServer *_server_instance = nullptr;
 
+static void register_myrias_project_setting(const String &p_name, const Variant &p_default, Variant::Type p_type) {
+	ProjectSettings *ps = ProjectSettings::get_singleton();
+	if (ps == nullptr) {
+		return;
+	}
+	if (!ps->has_setting(p_name)) {
+		ps->set_setting(p_name, p_default);
+	}
+	ps->set_initial_value(p_name, p_default);
+	Dictionary prop;
+	prop["name"] = p_name;
+	prop["type"] = p_type;
+	prop["hint"] = PROPERTY_HINT_NONE;
+	prop["hint_string"] = "";
+	ps->add_property_info(prop);
+}
+
 void initialize_example_module(ModuleInitializationLevel p_level) {
 	if (p_level != MODULE_INITIALIZATION_LEVEL_SCENE) {
 		return;
@@ -23,6 +44,8 @@ void initialize_example_module(ModuleInitializationLevel p_level) {
 
 	GDREGISTER_CLASS(MyriasEntityModel);
 	GDREGISTER_CLASS(MyriasGroup);
+	GDREGISTER_CLASS(MyriasCollider);
+	GDREGISTER_CLASS(MyriasColliderContainer);
 	GDREGISTER_VIRTUAL_CLASS(MyriasTrait);
 	GDREGISTER_CLASS(MyriasTraitFollowSteering);
 	GDREGISTER_CLASS(MyriasTraitFollowAngular);
@@ -31,6 +54,9 @@ void initialize_example_module(ModuleInitializationLevel p_level) {
 	GDREGISTER_CLASS(MyriasTraitFaceVelocity);
 	GDREGISTER_CLASS(MyriasTraitFaceNode);
 	GDREGISTER_CLASS(MyriasServer);
+
+	register_myrias_project_setting("myrias/debug/draw_static_sdf", false, Variant::BOOL);
+	register_myrias_project_setting("myrias/debug/draw_dynamic_colliders", false, Variant::BOOL);
 
 	_server_instance = memnew(MyriasServer);
 	Engine::get_singleton()->register_singleton("MyriasServer", _server_instance);

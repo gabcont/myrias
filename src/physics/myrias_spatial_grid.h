@@ -122,6 +122,9 @@ public:
             const uint16_t mask = g.collision_mask;
             const uint32_t traits = g.traits;
             const uint16_t gid = (uint16_t)g.group_id;
+            constexpr uint32_t s_phys = 14 - TRAIT_BEHAVIOR_FIRST_BIT;
+            const bool has_phys_bitvec = !g.trait_bits[s_phys].is_empty();
+            const uint64_t *phys_bits = has_phys_bitvec ? g.trait_bits[s_phys].ptr() : nullptr;
 
             const uint32_t num_words = (g.last_active + 63) / 64;
             for (uint32_t w = 0; w < num_words; w++) {
@@ -142,11 +145,20 @@ public:
                         max_r = r;
                     }
 
+                    uint32_t ent_traits = traits;
+                    if (has_phys_bitvec) {
+                        if (ALIVE_TEST(phys_bits, j)) {
+                            ent_traits |= TRAIT_PHYSICS;
+                        } else {
+                            ent_traits &= ~TRAIT_PHYSICS;
+                        }
+                    }
+
                     const int cx = world_to_cell_x(x);
                     const int cy = world_to_cell_y(y);
                     const int cell = cy * m_cols + cx;
 
-                    unsorted[total] = { x, y, vx, vy, r, layer, mask, traits, gid, (uint16_t)j };
+                    unsorted[total] = { x, y, vx, vy, r, layer, mask, ent_traits, gid, (uint16_t)j };
                     cells[total] = cell;
                     counts[cell]++;
                     total++;
@@ -251,6 +263,19 @@ public:
         }
         return false;
     }
+
+    void get_cell_range(const Rect2 &p_aabb, int &r_min_cx, int &r_max_cx, int &r_min_cy, int &r_max_cy) const {
+        r_min_cx = world_to_cell_x(p_aabb.position.x - m_max_radius);
+        r_max_cx = world_to_cell_x(p_aabb.position.x + p_aabb.size.x + m_max_radius);
+        r_min_cy = world_to_cell_y(p_aabb.position.y - m_max_radius);
+        r_max_cy = world_to_cell_y(p_aabb.position.y + p_aabb.size.y + m_max_radius);
+    }
+
+    const int *get_cell_start() const { return m_cell_start.ptr(); }
+    const int *get_cell_count() const { return m_cell_count.ptr(); }
+    int get_cols() const { return m_cols; }
+    int get_rows() const { return m_rows; }
+    float get_max_radius() const { return m_max_radius; }
 
     Vector<PhysicsProxy> &get_sorted_proxies() { return m_sorted_proxies; }
     const Vector<PhysicsProxy> &get_sorted_proxies() const { return m_sorted_proxies; }

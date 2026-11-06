@@ -8,5 +8,7 @@ compile_commands.json
 *.md
 !docs/**/*.md
 !docs/*.md
+docs/
+plans/
 *.uid
 *.tracy

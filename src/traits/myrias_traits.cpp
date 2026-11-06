@@ -42,7 +42,7 @@ static const TraitKernelFn s_trait_kernels[32] = {
 };
 
 void run_group_traits(GroupContext &r_group, EntitySoA &r_soa, float p_dt) {
-    uint32_t mask = r_group.traits & TRAIT_BEHAVIOR_MASK;
+    uint32_t mask = r_group.traits & TRAIT_LOGIC_MASK;
     while (mask) {
         const uint32_t bit = __builtin_ctz(mask);
         mask &= mask - 1;

@@ -369,3 +369,121 @@ void MyriasTraitFaceNode::_bind_methods() {
     ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "angle_offset_degrees", PROPERTY_HINT_RANGE, "-360.0,360.0,0.1"),
             "set_angle_offset_degrees", "get_angle_offset_degrees");
 }
+
+// 7. Physics
+MyriasTraitPhysics::MyriasTraitPhysics() {
+    m_config = std::make_shared<PhysicsTraitConfig>();
+}
+
+MyriasTraitPhysics::~MyriasTraitPhysics() {
+    if (m_physics_material.is_valid() && m_physics_material->is_connected("changed", Callable(this, "_on_material_changed"))) {
+        m_physics_material->disconnect("changed", Callable(this, "_on_material_changed"));
+    }
+}
+
+void MyriasTraitPhysics::_on_material_changed() {
+    emit_changed();
+}
+
+void MyriasTraitPhysics::set_mass(float p_mass) {
+    m_mass = MAX(p_mass, 1e-6f);
+    emit_changed();
+}
+float MyriasTraitPhysics::get_mass() const {
+    return m_mass;
+}
+
+void MyriasTraitPhysics::set_bounce(float p_bounce) {
+    m_bounce = CLAMP(p_bounce, 0.0f, 1.0f);
+    emit_changed();
+}
+float MyriasTraitPhysics::get_bounce() const {
+    return m_bounce;
+}
+
+void MyriasTraitPhysics::set_friction(float p_friction) {
+    m_friction = CLAMP(p_friction, 0.0f, 1.0f);
+    emit_changed();
+}
+float MyriasTraitPhysics::get_friction() const {
+    return m_friction;
+}
+
+void MyriasTraitPhysics::set_physics_material(const Ref<PhysicsMaterial> &p_material) {
+    if (m_physics_material.is_valid() && m_physics_material->is_connected("changed", Callable(this, "_on_material_changed"))) {
+        m_physics_material->disconnect("changed", Callable(this, "_on_material_changed"));
+    }
+    m_physics_material = p_material;
+    if (m_physics_material.is_valid() && !m_physics_material->is_connected("changed", Callable(this, "_on_material_changed"))) {
+        m_physics_material->connect("changed", Callable(this, "_on_material_changed"));
+    }
+    emit_changed();
+}
+Ref<PhysicsMaterial> MyriasTraitPhysics::get_physics_material() const {
+    return m_physics_material;
+}
+
+void MyriasTraitPhysics::set_gravity_scale(float p_scale) {
+    m_gravity_scale = p_scale;
+    emit_changed();
+}
+float MyriasTraitPhysics::get_gravity_scale() const {
+    return m_gravity_scale;
+}
+
+void MyriasTraitPhysics::set_linear_damp(float p_damp) {
+    m_linear_damp = MAX(p_damp, 0.0f);
+    emit_changed();
+}
+float MyriasTraitPhysics::get_linear_damp() const {
+    return m_linear_damp;
+}
+
+std::shared_ptr<TraitConfig> MyriasTraitPhysics::build_config(Node2D *p_owner) const {
+    (void)p_owner;
+    m_config->mass = MAX(m_mass, 1e-6f);
+    m_config->inv_mass = 1.0f / m_config->mass;
+    if (m_physics_material.is_valid()) {
+        const float b = CLAMP(m_physics_material->get_bounce(), 0.0f, 1.0f);
+        const float f = CLAMP(m_physics_material->get_friction(), 0.0f, 1.0f);
+        m_config->bounce = m_physics_material->is_absorbent() ? -b : b;
+        m_config->friction = m_physics_material->is_rough() ? -f : f;
+    } else {
+        m_config->bounce = CLAMP(m_bounce, 0.0f, 1.0f);
+        m_config->friction = CLAMP(m_friction, 0.0f, 1.0f);
+    }
+    m_config->gravity_scale = m_gravity_scale;
+    m_config->linear_damp = MAX(m_linear_damp, 0.0f);
+    return m_config;
+}
+
+void MyriasTraitPhysics::_bind_methods() {
+    ClassDB::bind_method(D_METHOD("_on_material_changed"), &MyriasTraitPhysics::_on_material_changed);
+
+    ClassDB::bind_method(D_METHOD("set_mass", "mass"), &MyriasTraitPhysics::set_mass);
+    ClassDB::bind_method(D_METHOD("get_mass"), &MyriasTraitPhysics::get_mass);
+    ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "mass", PROPERTY_HINT_RANGE, "0.001,1000.0,0.01"), "set_mass", "get_mass");
+
+    ClassDB::bind_method(D_METHOD("set_bounce", "bounce"), &MyriasTraitPhysics::set_bounce);
+    ClassDB::bind_method(D_METHOD("get_bounce"), &MyriasTraitPhysics::get_bounce);
+    ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "bounce", PROPERTY_HINT_RANGE, "0.0,1.0,0.01"), "set_bounce", "get_bounce");
+
+    ClassDB::bind_method(D_METHOD("set_friction", "friction"), &MyriasTraitPhysics::set_friction);
+    ClassDB::bind_method(D_METHOD("get_friction"), &MyriasTraitPhysics::get_friction);
+    ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "friction", PROPERTY_HINT_RANGE, "0.0,1.0,0.01"), "set_friction", "get_friction");
+
+    ClassDB::bind_method(D_METHOD("set_physics_material", "physics_material"), &MyriasTraitPhysics::set_physics_material);
+    ClassDB::bind_method(D_METHOD("get_physics_material"), &MyriasTraitPhysics::get_physics_material);
+    ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "physics_material", PROPERTY_HINT_RESOURCE_TYPE, "PhysicsMaterial"),
+            "set_physics_material", "get_physics_material");
+
+    ClassDB::bind_method(D_METHOD("set_gravity_scale", "gravity_scale"), &MyriasTraitPhysics::set_gravity_scale);
+    ClassDB::bind_method(D_METHOD("get_gravity_scale"), &MyriasTraitPhysics::get_gravity_scale);
+    ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "gravity_scale", PROPERTY_HINT_RANGE, "-10.0,10.0,0.05"),
+            "set_gravity_scale", "get_gravity_scale");
+
+    ClassDB::bind_method(D_METHOD("set_linear_damp", "linear_damp"), &MyriasTraitPhysics::set_linear_damp);
+    ClassDB::bind_method(D_METHOD("get_linear_damp"), &MyriasTraitPhysics::get_linear_damp);
+    ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "linear_damp", PROPERTY_HINT_RANGE, "0.0,100.0,0.05"),
+            "set_linear_damp", "get_linear_damp");
+}

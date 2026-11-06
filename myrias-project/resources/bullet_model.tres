@@ -40,3 +40,4 @@ animations = [{
 
 [resource]
 sprite_frames = SubResource("SpriteFrames_ce6s2")
+collision_mask = 5

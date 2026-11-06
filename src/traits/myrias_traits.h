@@ -14,11 +14,14 @@ enum MyriasTraitType : uint32_t {
     TRAIT_CURVE_MODIFIER  = 1u << 11,
     TRAIT_FACE_VELOCITY   = 1u << 12,
     TRAIT_FACE_NODE       = 1u << 13,
+    TRAIT_PHYSICS         = 1u << 14,
 };
 
 static constexpr uint32_t TRAIT_BEHAVIOR_FIRST_BIT = 8;
-static constexpr uint32_t TRAIT_BEHAVIOR_COUNT = 6;
-static constexpr uint32_t TRAIT_BEHAVIOR_MASK = 0x3F00u;
+static constexpr uint32_t TRAIT_BEHAVIOR_COUNT = 7;
+static constexpr uint32_t TRAIT_LOGIC_MASK = 0x3F00u;
+static constexpr uint32_t TRAIT_PHYSICS_MASK = (uint32_t)TRAIT_PHYSICS;
+static constexpr uint32_t TRAIT_BEHAVIOR_MASK = 0x7F00u;
 
 enum MyriasCurveTarget : int {
     CURVE_TARGET_SCALE = 0,

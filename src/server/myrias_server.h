@@ -102,6 +102,8 @@ private:
     void update_physics_debug_draw();
     void step_group_bounds(GroupContext &r_group);
     void step_group_animation(GroupContext &r_group);
+    const PhysicsTraitConfig *get_group_physics_config(uint16_t p_group_id) const;
+    void step_world_physics(float p_dt, int p_total_proxies);
 
     void exec_create_group(const MyriasCommand &p_cmd);
     void exec_remove_group(int p_group_id);
@@ -177,7 +179,6 @@ public:
     int register_collider(CollisionObject2D *p_node, int p_mode = COLLIDER_MODE_AUTO);
     void unregister_collider(int p_collider_id);
     bool set_collider_mode(int p_collider_id, int p_mode);
-    int get_collider_mode(int p_collider_id) const;
     bool rebuild_collider_shapes(int p_collider_id);
     void configure_static_sdf(Rect2 p_bounds, float p_cell_size = 8.0f);
     float sample_static_sdf_distance(Vector2 p_pos, uint16_t p_mask = 0xFFFF) const;
@@ -187,6 +188,19 @@ public:
     int get_dynamic_collider_count() const;
     bool is_collider_static(int p_collider_id) const;
     Rect2 get_collider_aabb(int p_collider_id) const;
+    void apply_collider_impulse(int p_collider_id, Vector2 p_impulse, Vector2 p_world_pos = Vector2());
+    float get_collider_mass(int p_collider_id) const;
+    float get_collider_inv_mass(int p_collider_id) const;
+    float get_collider_inertia(int p_collider_id) const;
+    float get_collider_inv_inertia(int p_collider_id) const;
+    float get_collider_bounce(int p_collider_id) const;
+    float get_collider_friction(int p_collider_id) const;
+    Vector2 get_collider_linear_velocity(int p_collider_id) const;
+    float get_collider_angular_velocity(int p_collider_id) const;
+    Vector2 get_collider_point_velocity(int p_collider_id, Vector2 p_world_point) const;
+    Dictionary get_area_space_override_info(int p_collider_id) const;
+    float combine_bounce(float p_a, float p_b) const;
+    float combine_friction(float p_a, float p_b) const;
 
     // Debug Visualization
     void set_debug_draw_static_sdf(bool p_enabled);

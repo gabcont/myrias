@@ -14,7 +14,6 @@ private:
     float m_radius = 8.0f;
     uint16_t m_collision_layer = 1;
     uint16_t m_collision_mask = 1;
-    uint32_t m_traits = 0;
 
 protected:
     static void _bind_methods();
@@ -31,7 +30,4 @@ public:
 
     void set_collision_mask(uint32_t p_mask);
     uint32_t get_collision_mask() const;
-
-    void set_traits(uint32_t p_traits);
-    uint32_t get_traits() const;
 };

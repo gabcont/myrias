@@ -31,7 +31,6 @@ struct MyriasCommand {
     float radius = 8.0f;
     uint16_t collision_layer = 1;
     uint16_t collision_mask = 1;
-    uint32_t traits = 0;
     uint16_t pool_size = 0;
     RID ci;
 

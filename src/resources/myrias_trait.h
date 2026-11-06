@@ -3,6 +3,7 @@
 #include <memory>
 #include <godot_cpp/classes/curve.hpp>
 #include <godot_cpp/classes/node2d.hpp>
+#include <godot_cpp/classes/physics_material.hpp>
 #include <godot_cpp/classes/resource.hpp>
 #include <godot_cpp/core/class_db.hpp>
 #include <godot_cpp/variant/node_path.hpp>
@@ -15,6 +16,7 @@
 #include "traits/trait_curve_modifier.h"
 #include "traits/trait_face_velocity.h"
 #include "traits/trait_face_node.h"
+#include "traits/trait_physics.h"
 
 using namespace godot;
 
@@ -197,5 +199,48 @@ public:
     float get_angle_offset_degrees() const;
 
     MyriasTraitType get_trait_type() const override { return TRAIT_FACE_NODE; }
+    std::shared_ptr<TraitConfig> build_config(Node2D *p_owner = nullptr) const override;
+};
+
+class MyriasTraitPhysics : public MyriasTrait {
+    GDCLASS(MyriasTraitPhysics, MyriasTrait);
+
+private:
+    float m_mass = 1.0f;
+    float m_bounce = 0.5f;
+    float m_friction = 0.2f;
+    Ref<PhysicsMaterial> m_physics_material;
+    float m_gravity_scale = 1.0f;
+    float m_linear_damp = 0.0f;
+    std::shared_ptr<PhysicsTraitConfig> m_config;
+
+    void _on_material_changed();
+
+protected:
+    static void _bind_methods();
+
+public:
+    MyriasTraitPhysics();
+    ~MyriasTraitPhysics();
+
+    void set_mass(float p_mass);
+    float get_mass() const;
+
+    void set_bounce(float p_bounce);
+    float get_bounce() const;
+
+    void set_friction(float p_friction);
+    float get_friction() const;
+
+    void set_physics_material(const Ref<PhysicsMaterial> &p_material);
+    Ref<PhysicsMaterial> get_physics_material() const;
+
+    void set_gravity_scale(float p_scale);
+    float get_gravity_scale() const;
+
+    void set_linear_damp(float p_damp);
+    float get_linear_damp() const;
+
+    MyriasTraitType get_trait_type() const override { return TRAIT_PHYSICS; }
     std::shared_ptr<TraitConfig> build_config(Node2D *p_owner = nullptr) const override;
 };

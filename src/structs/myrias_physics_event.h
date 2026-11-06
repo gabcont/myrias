@@ -13,16 +13,6 @@
 #define GROUP_SET_DIRTY(t)    ((t) |= GROUP_FLAG_DIRTY)
 #define GROUP_CLEAR_DIRTY(t)  ((t) &= ~GROUP_FLAG_DIRTY)
 
-// User-facing physics traits (bits 4-7)
-enum MyriasPhysicsTrait : uint32_t {
-    TRAIT_NONE           = 0,
-    TRAIT_SEPARATION     = 1u << 4, // Soft separation / push-out
-    TRAIT_BOUNCE         = 1u << 5, // Reflect velocity on collision
-    TRAIT_DESPAWN_ON_HIT = 1u << 6, // Despawn entity on collision
-    TRAIT_ANIM_ON_HIT    = 1u << 7, // Change animation on collision
-};
-using EntityPhysicsTraits = MyriasPhysicsTrait;
-
 // Deferred physics event emitted during collision/physics resolution,
 // processed by MyriasServer on the next frame.
 struct MyriasPhysicsEvent {

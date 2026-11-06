@@ -44,12 +44,14 @@ animations = [{
 
 [sub_resource type="MyriasEntityModel" id="MyriasEntityModel_epypp"]
 sprite_frames = SubResource("SpriteFrames_ce6s2")
-traits = 16
+collision_mask = 2
 
 [sub_resource type="MyriasTraitFaceVelocity" id="MyriasTraitFaceVelocity_lkwfj"]
 
 [sub_resource type="MyriasTraitFollowSteering" id="MyriasTraitFollowSteering_0kp58"]
 target_node_path = NodePath("../../Dynamic/CharacterBody2D/AnimatedSprite2D")
+
+[sub_resource type="MyriasTraitPhysics" id="MyriasTraitPhysics_8ig3b"]
 
 [sub_resource type="MyriasTraitSineWave" id="MyriasTraitSineWave_gkas0"]
 
@@ -61,8 +63,12 @@ point_count = 2
 curve = SubResource("Curve_nvonf")
 loop = true
 
+[sub_resource type="MyriasTraitPhysics" id="MyriasTraitPhysics_2rk1b"]
+
 [sub_resource type="MyriasTraitFaceNode" id="MyriasTraitFaceNode_qbgvs"]
 target_node_path = NodePath("../../Dynamic/CharacterBody2D/AnimatedSprite2D")
+
+[sub_resource type="MyriasTraitPhysics" id="MyriasTraitPhysics_2c3st"]
 
 [sub_resource type="SpriteFrames" id="SpriteFrames_epypp"]
 animations = [{
@@ -84,10 +90,16 @@ animations = [{
 "speed": 10.0
 }]
 
-[sub_resource type="CircleShape2D" id="CircleShape2D_dlk71"]
+[sub_resource type="CircleShape2D" id="CircleShape2D_2c3st"]
+radius = 28.62
 
-[sub_resource type="PhysicsMaterial" id="PhysicsMaterial_8ig3b"]
-bounce = 1.0
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_f1ear"]
+size = Vector2(28, 24)
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_f1ear"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_kjmcp"]
+size = Vector2(69, 26)
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_dlk71"]
 
@@ -95,8 +107,13 @@ bounce = 1.0
 
 [sub_resource type="CircleShape2D" id="CircleShape2D_ce6s2"]
 
+[sub_resource type="PhysicsMaterial" id="PhysicsMaterial_2c3st"]
+friction = 0.0
+
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_dxrgm"]
 size = Vector2(131.42032, 6.368454)
+
+[sub_resource type="PhysicsMaterial" id="PhysicsMaterial_8ig3b"]
 
 [sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_8ig3b"]
 texture = ExtResource("2_2c3st")
@@ -111,7 +128,8 @@ texture = ExtResource("2_2c3st")
 
 [sub_resource type="TileSet" id="TileSet_dlk71"]
 physics_layer_0/collision_layer = 2
-physics_layer_0/collision_mask = 13
+physics_layer_0/collision_mask = 0
+physics_layer_0/physics_material = SubResource("PhysicsMaterial_8ig3b")
 sources/0 = SubResource("TileSetAtlasSource_8ig3b")
 
 [node name="Node2D" type="Node2D" unique_id=586481091]
@@ -121,7 +139,7 @@ script = ExtResource("1_8ig3b")
 
 [node name="MyriasGroup3" type="MyriasGroup" parent="Spawners" unique_id=2029508114]
 model = SubResource("MyriasEntityModel_epypp")
-traits = Array[MyriasTrait]([SubResource("MyriasTraitFaceVelocity_lkwfj"), SubResource("MyriasTraitFollowSteering_0kp58")])
+traits = Array[MyriasTrait]([SubResource("MyriasTraitFaceVelocity_lkwfj"), SubResource("MyriasTraitFollowSteering_0kp58"), SubResource("MyriasTraitPhysics_8ig3b")])
 pool_size = 10000
 script = ExtResource("3_f1ear")
 speed = 40
@@ -142,13 +160,14 @@ incremental = 0.05
 position = Vector2(644, 206)
 
 [node name="MyriasGroup" parent="Spawners" unique_id=1289511767 instance=ExtResource("4_kjmcp")]
+traits = Array[MyriasTrait]([SubResource("MyriasTraitPhysics_2rk1b")])
 pool_size = 10000
 speed = 40
 random = false
 
 [node name="MyriasGroup2" type="MyriasGroup" parent="Spawners" unique_id=1382157227]
 model = SubResource("MyriasEntityModel_epypp")
-traits = Array[MyriasTrait]([SubResource("MyriasTraitFaceNode_qbgvs")])
+traits = Array[MyriasTrait]([SubResource("MyriasTraitFaceNode_qbgvs"), SubResource("MyriasTraitPhysics_2c3st")])
 pool_size = 10000
 script = ExtResource("3_f1ear")
 speed = 40
@@ -175,7 +194,7 @@ metadata/_edit_use_anchors_ = true
 [node name="Dynamic" type="Node2D" parent="." unique_id=631343118]
 
 [node name="CharacterBody2D" type="CharacterBody2D" parent="Dynamic" unique_id=1492857485]
-position = Vector2(879, 314)
+position = Vector2(772, 468)
 motion_mode = 1
 script = ExtResource("5_m2y74")
 
@@ -184,15 +203,61 @@ sprite_frames = SubResource("SpriteFrames_epypp")
 autoplay = "default"
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="Dynamic/CharacterBody2D" unique_id=2055184125]
-shape = SubResource("CircleShape2D_dlk71")
+shape = SubResource("CircleShape2D_2c3st")
 
 [node name="MyriasCollider" type="MyriasCollider" parent="Dynamic/CharacterBody2D" unique_id=833700656]
 
+[node name="CharacterBody2D2" type="CharacterBody2D" parent="Dynamic" unique_id=893756098]
+position = Vector2(879, 314)
+motion_mode = 1
+script = ExtResource("5_m2y74")
+
+[node name="AnimatedSprite2D" type="AnimatedSprite2D" parent="Dynamic/CharacterBody2D2" unique_id=448300677]
+sprite_frames = SubResource("SpriteFrames_epypp")
+autoplay = "default"
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Dynamic/CharacterBody2D2" unique_id=527898065]
+position = Vector2(4, 2)
+shape = SubResource("RectangleShape2D_f1ear")
+
+[node name="MyriasCollider" type="MyriasCollider" parent="Dynamic/CharacterBody2D2" unique_id=1794730866]
+
+[node name="CharacterBody2D3" type="CharacterBody2D" parent="Dynamic" unique_id=370381562]
+position = Vector2(553, 297)
+motion_mode = 1
+script = ExtResource("5_m2y74")
+
+[node name="AnimatedSprite2D" type="AnimatedSprite2D" parent="Dynamic/CharacterBody2D3" unique_id=120712217]
+sprite_frames = SubResource("SpriteFrames_epypp")
+autoplay = "default"
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Dynamic/CharacterBody2D3" unique_id=421174020]
+shape = SubResource("CircleShape2D_f1ear")
+
+[node name="MyriasCollider" type="MyriasCollider" parent="Dynamic/CharacterBody2D3" unique_id=257506358]
+
+[node name="CharacterBody2D4" type="CharacterBody2D" parent="Dynamic" unique_id=168209293]
+position = Vector2(770, 149)
+motion_mode = 1
+script = ExtResource("5_m2y74")
+
+[node name="AnimatedSprite2D" type="AnimatedSprite2D" parent="Dynamic/CharacterBody2D4" unique_id=1897304530]
+sprite_frames = SubResource("SpriteFrames_epypp")
+autoplay = "default"
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Dynamic/CharacterBody2D4" unique_id=552909650]
+position = Vector2(2, -1)
+shape = SubResource("RectangleShape2D_kjmcp")
+
+[node name="MyriasCollider" type="MyriasCollider" parent="Dynamic/CharacterBody2D4" unique_id=1340018503]
+
 [node name="RigidBody2D" type="RigidBody2D" parent="Dynamic" unique_id=397364881]
 position = Vector2(353, 470)
-physics_material_override = SubResource("PhysicsMaterial_8ig3b")
+collision_layer = 4
+collision_mask = 2
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="Dynamic/RigidBody2D" unique_id=1229888638]
+position = Vector2(-286, 60)
 shape = SubResource("RectangleShape2D_dlk71")
 
 [node name="MyriasCollider" type="MyriasCollider" parent="Dynamic/RigidBody2D" unique_id=392243149]
@@ -202,6 +267,7 @@ position = Vector2(210, 166)
 scale = Vector2(5.669526, 4.960021)
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="Dynamic/Area2D" unique_id=1899882008]
+position = Vector2(34.923553, 76.410965)
 shape = SubResource("CircleShape2D_8ig3b")
 
 [node name="MyriasCollider" type="MyriasCollider" parent="Dynamic/Area2D" unique_id=1402309856]
@@ -213,15 +279,40 @@ mode = 1
 
 [node name="Tube" type="StaticBody2D" parent="Static/MyriasColliderContainer" unique_id=628496649]
 position = Vector2(1101, 450)
+collision_layer = 2
+collision_mask = 0
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="Static/MyriasColliderContainer/Tube" unique_id=1995698572]
 scale = Vector2(4.1508703, 4.130466)
 shape = SubResource("CircleShape2D_ce6s2")
 
+[node name="Tube2" type="StaticBody2D" parent="Static/MyriasColliderContainer" unique_id=6350451]
+position = Vector2(674, 388)
+collision_layer = 2
+collision_mask = 0
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Static/MyriasColliderContainer/Tube2" unique_id=1860723129]
+scale = Vector2(4.1508703, 4.130466)
+shape = SubResource("CircleShape2D_ce6s2")
+
 [node name="Wall" type="StaticBody2D" parent="Static/MyriasColliderContainer" unique_id=1853526466]
 position = Vector2(93, 586)
+collision_layer = 2
+collision_mask = 0
+physics_material_override = SubResource("PhysicsMaterial_2c3st")
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="Static/MyriasColliderContainer/Wall" unique_id=1834508436]
+position = Vector2(231.24567, -28.152344)
+scale = Vector2(4.0937424, 4.130466)
+shape = SubResource("RectangleShape2D_dxrgm")
+
+[node name="Wall2" type="StaticBody2D" parent="Static/MyriasColliderContainer" unique_id=268187756]
+position = Vector2(-201, 410)
+collision_layer = 2
+collision_mask = 0
+physics_material_override = SubResource("PhysicsMaterial_2c3st")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Static/MyriasColliderContainer/Wall2" unique_id=1432259694]
 position = Vector2(231.24567, -28.152344)
 scale = Vector2(4.0937424, 4.130466)
 shape = SubResource("RectangleShape2D_dxrgm")

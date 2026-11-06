@@ -53,6 +53,7 @@ void initialize_example_module(ModuleInitializationLevel p_level) {
 	GDREGISTER_CLASS(MyriasTraitCurveModifier);
 	GDREGISTER_CLASS(MyriasTraitFaceVelocity);
 	GDREGISTER_CLASS(MyriasTraitFaceNode);
+	GDREGISTER_CLASS(MyriasTraitPhysics);
 	GDREGISTER_CLASS(MyriasServer);
 
 	register_myrias_project_setting("myrias/debug/draw_static_sdf", false, Variant::BOOL);
